@@ -2808,3 +2808,46 @@ tbody tr[data-account-id]:focus .account-primary {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Accounts without an app entry */
+.rc-missing {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.rc-missing summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+.rc-missing-list {
+  display: grid;
+  gap: 4px;
+  max-height: 320px;
+  margin: 8px 0;
+  overflow-y: auto;
+}
+.rc-missing-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.rc-missing-row strong,
+.rc-missing-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.rc-missing-row small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.rc-missing-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

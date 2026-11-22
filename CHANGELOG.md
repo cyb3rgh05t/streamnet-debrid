@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.057] - 2026-11-22
+
+- Adminpanel, Playlists und Add-ons: Die Bestandskarte zeigt „N von M Accounts in der Cloud“ und erklärt, dass die App die StreamNet-TV-Playlist selbst anlegt und sie nicht löschbar ist; gezählt werden nur Accounts mit Cloud-Snapshot, Geräte ohne Cloud-Konto oder ohne Sync sind nicht sichtbar.
+- Adminpanel, Accounts ohne App-Eintrag: Pro App-Eintrag (StreamNet TV, OpenSubtitles v3) gibt es eine ausklappbare Liste der Accounts, in deren Snapshot er fehlt, mit E-Mail und letztem Geräte-Kontakt; Konten, bei denen nie ein Gerät gemeldet wurde, stehen oben. „Öffnen“ springt zum Account. Mehrere Konten lassen sich auswählen („Alle ohne Gerät auswählen“, nichts ist vorausgewählt) und löschen, mit Bestätigung durch Eintippen von „LÖSCHEN“, Pflichtgrund und Audit-Eintrag je Konto.
+- Backend: `GET /admin-api/global` liefert dafür `missingAccounts` je App-Eintrag (höchstens 300) und liest E-Mail, Erstelldatum und letzten Geräte-Kontakt (`device_presence`) mit.
+- Tests: 177 von 178 Backend-Tests ohne Fehler, darunter ein neuer Test für die Lückenliste; der eine Fehler ist der bekannte, nur unter Windows. Nicht geprüft: das echte Löschen mehrerer Konten gegen die Datenbank (nur der Bestätigungsdialog im Demo-Server).
+
 ## [2.6.019] - 2026-11-21
 
 - Android-Version: `2.6.019` / Code `520`.

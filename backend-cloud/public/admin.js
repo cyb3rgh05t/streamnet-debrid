@@ -1859,12 +1859,14 @@ function rcIsChanged(item) {
 const rcInventories = {
   playlists: {
     key: "playlists", noun: "Playlist",
+    note: "Die App legt diese Playlist selbst an und lässt sie nicht löschen. Hier zählen nur Accounts, in deren Cloud-Snapshot sie schon steht; Geräte ohne Cloud-Konto oder ohne Sync sind hier nicht sichtbar.",
     actions: [["Bearbeiten", "edit_playlist"], ["Host ändern", "change_xtream_host"], ["Entfernen", "delete_playlist"]],
     extra: { streamnet_tv: [["Host zurücksetzen", "clear_streamnet_host_override"]] },
     add: ["Playlist hinzufügen", "add_playlist"],
   },
   addons: {
     key: "addons", noun: "Add-on",
+    note: "Gezählt werden nur Accounts mit Cloud-Snapshot, in dem dieses Add-on steht.",
     actions: [["Bearbeiten", "edit_addon"], ["Entfernen", "delete_addon"]],
     extra: {},
     add: ["Add-on hinzufügen", "add_addon"],
@@ -1883,6 +1885,91 @@ function rcRunAction(category, operation, targetId) {
   byId(`rc-slot-${category}`).scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+// Collapsible list of accounts whose cloud snapshot lacks an app entry, with selection and deletion.
+function rcMissingAccounts(item, setup) {
+  const details = document.createElement("details");
+  details.className = "rc-missing";
+  details.append(rcElement("summary", `Accounts ohne ${item.name} (${item.missingAccounts.length})`));
+  details.append(rcElement("p", "Ohne Eintrag heißt: Von diesem Account hat noch kein Gerät diesen Eintrag in die Cloud gesendet. Konten, bei denen nie ein Gerät gemeldet wurde, stehen oben.", "rc-hint"));
+  const list = rcElement("div", null, "rc-missing-list");
+  const boxes = [];
+  for (const account of item.missingAccounts) {
+    const row = rcElement("label", null, "rc-missing-row");
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.addEventListener("change", updateDelete);
+    boxes.push([box, account]);
+    const names = rcElement("span");
+    names.append(rcElement("strong", account.email || account.id));
+    names.append(rcElement("small", account.lastDeviceSeenAt
+      ? `Gerät zuletzt gesehen ${formatDate(account.lastDeviceSeenAt)}`
+      : "Nie ein Gerät gemeldet"));
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "text-button";
+    open.textContent = "Öffnen";
+    open.addEventListener("click", (event) => {
+      event.preventDefault();
+      void openAccount(account.id);
+    });
+    row.append(box, names, open);
+    list.append(row);
+  }
+  const bar = rcElement("div", null, "rc-missing-bar");
+  const all = document.createElement("button");
+  all.type = "button";
+  all.className = "button secondary";
+  all.textContent = "Alle ohne Gerät auswählen";
+  all.addEventListener("click", () => {
+    for (const [box, account] of boxes) box.checked = !account.lastDeviceSeenAt;
+    updateDelete();
+  });
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = "button danger";
+  del.disabled = true;
+  del.textContent = "Ausgewählte Konten löschen";
+  function updateDelete() {
+    const count = boxes.filter(([box]) => box.checked).length;
+    del.disabled = count === 0;
+    del.textContent = count ? `${count} ${count === 1 ? "Konto" : "Konten"} löschen` : "Ausgewählte Konten löschen";
+  }
+  del.addEventListener("click", () => void rcDeleteAccounts(boxes.filter(([box]) => box.checked).map(([, account]) => account), del));
+  bar.append(all, del);
+  details.append(list, bar);
+  return details;
+}
+
+async function rcDeleteAccounts(accounts, button) {
+  const typed = await openAdminDialog({
+    title: `${accounts.length} Konten löschen`,
+    eyebrow: "GEFÄHRLICH",
+    message: `Es werden ${accounts.length} Konten samt Cloud-Daten, Sitzungen und Verlauf endgültig gelöscht: ${accounts.slice(0, 5).map((a) => a.email || a.id).join(", ")}${accounts.length > 5 ? " …" : ""}. Zum Bestätigen LÖSCHEN eingeben.`,
+    inputLabel: "Bestätigung",
+    requiredText: "LÖSCHEN",
+    requiredTextError: "Bitte LÖSCHEN eingeben.",
+    confirmLabel: "Weiter",
+    danger: true,
+  });
+  if (typed !== "LÖSCHEN") return;
+  const reason = await promptReason("Warum sollen diese Konten endgültig gelöscht werden?", true);
+  if (!reason) return;
+  setButtonBusy(button, true, "Wird gelöscht…");
+  let deleted = 0;
+  try {
+    for (const account of accounts) {
+      await api(`/admin-api/accounts/${encodeURIComponent(account.id)}`, { method: "DELETE", body: JSON.stringify({ reason }) });
+      deleted += 1;
+    }
+    showToast(`${deleted} Konten gelöscht.`);
+  } catch (error) {
+    showToast(`Nach ${deleted} gelöschten Konten abgebrochen: ${error.message}`, true);
+  } finally {
+    setButtonBusy(button, false);
+    await loadGlobal();
+  }
+}
+
 function renderRcInventory() {
   const configurable = state.global?.configurable ?? 0;
   for (const [category, setup] of Object.entries(rcInventories)) {
@@ -1895,7 +1982,8 @@ function renderRcInventory() {
       const meter = document.createElement("progress");
       meter.max = Math.max(configurable, item.accountCount, 1);
       meter.value = item.accountCount;
-      const count = rcElement("span", `${item.accountCount} von ${configurable} Accounts`, "rc-source-info");
+      const count = rcElement("span", `${item.accountCount} von ${configurable} Accounts in der Cloud`, "rc-source-info");
+      const note = rcElement("small", setup.note, "rc-hint");
       const actions = rcElement("div", null, "rc-inv-actions");
       for (const [label, operation] of [...setup.actions, ...(setup.extra[item.id] ?? [])]) {
         const button = document.createElement("button");
@@ -1905,7 +1993,8 @@ function renderRcInventory() {
         button.addEventListener("click", () => rcRunAction(category, operation, item.id));
         actions.append(button);
       }
-      card.append(head, meter, count, actions);
+      card.append(head, meter, count, note, actions);
+      if (item.missingAccounts?.length) card.append(rcMissingAccounts(item, setup));
       return card;
     });
     if (!cards.length) cards.push(rcElement("p", `Keine ${setup.noun}s der App in den Accounts gefunden.`, "rc-hint"));

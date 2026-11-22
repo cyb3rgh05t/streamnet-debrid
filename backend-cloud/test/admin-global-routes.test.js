@@ -88,8 +88,25 @@ test("global inventory counts all accounts and does not expose playlist URLs", a
   assert.equal(response.json().total, 4);
   assert.equal(response.json().configurable, 2);
   assert.equal(response.json().skipped, 2);
-  assert.deepEqual(response.json().playlists, [{ id: "tv", name: "TV", accountCount: 2 }]);
+  assert.deepEqual(response.json().playlists.find((item) => item.id === "tv"), { id: "tv", name: "TV", accountCount: 2 });
   assert.equal(response.body.includes("secret.test"), false);
+});
+
+test("global inventory lists the accounts that never synced an app entry, accounts without a device first", async (t) => {
+  const { rows, send } = await fixture(t);
+  rows[0].email = "a@example.test"; rows[0].last_device_seen_at = "2026-11-10T09:00:00Z";
+  rows[1].email = "b@example.test"; rows[1].last_device_seen_at = null;
+  rows[1].payload.iptvByProfile.main.playlists = [{ id: "streamnet_tv", name: "StreamNet TV", m3uUrl: "https://secret.test/token" }];
+  const body = (await send("GET", "/admin-api/global")).json();
+  const streamnet = body.playlists.find((item) => item.id === "streamnet_tv");
+  assert.equal(streamnet.accountCount, 1);
+  assert.deepEqual(streamnet.missingAccounts.map((account) => account.id), ["account-a"]);
+  assert.equal(streamnet.missingAccounts[0].email, "a@example.test");
+  const subtitles = body.addons.find((item) => item.id === "opensubtitles");
+  assert.equal(subtitles.accountCount, 0);
+  // Never-seen devices come first; the account without a snapshot or profile is not listed at all.
+  assert.deepEqual(subtitles.missingAccounts.map((account) => account.id), ["account-b", "account-a"]);
+  assert.equal(JSON.stringify(body).includes("secret.test"), false);
 });
 
 test("global preview performs no writes and applying advances every changed revision with an audit", async (t) => {

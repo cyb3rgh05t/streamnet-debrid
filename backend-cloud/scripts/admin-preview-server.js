@@ -18,6 +18,11 @@ let overridesSaved = {
   hidden: ["just_added"],
   newRows: [{ id: "top-horror", title: "Top Horror", url: "https://mdblist.com/lists/demo/top-horror", mediaType: "movie", after: "trending_movies" }],
 };
+let demoGaps = [
+  { id: "demo-gap-1", email: "nie.geraet@example.test", createdAt: "2026-11-06T07:12:00Z", lastDeviceSeenAt: null, snapshotUpdatedAt: "2026-11-15T12:55:00Z" },
+  { id: "demo-gap-2", email: "auch.keins@example.test", createdAt: "2026-11-06T07:32:00Z", lastDeviceSeenAt: null, snapshotUpdatedAt: "2026-11-15T12:55:00Z" },
+  { id: "demo-gap-3", email: "nur.web@example.test", createdAt: "2026-10-31T10:00:00Z", lastDeviceSeenAt: "2026-11-10T09:00:00Z", snapshotUpdatedAt: "2026-11-12T19:13:00Z" },
+];
 let overridesUpdatedAt = new Date().toISOString();
 
 const publicDirectory = path.resolve(
@@ -426,17 +431,22 @@ const server = createServer(async (request, reply) => {
     if (request.method === "GET" && url.pathname === "/admin-api/global/mdblist-titles") {
       return json(reply, 200, { titles: {} });
     }
+    if (request.method === "DELETE" && /^\/admin-api\/accounts\/demo-gap-/.test(url.pathname)) {
+      demoGaps = demoGaps.filter((gap) => url.pathname !== `/admin-api/accounts/${gap.id}`);
+      return json(reply, 200, { accepted: true });
+    }
     if (request.method === "GET" && url.pathname === "/admin-api/global") {
+      const gaps = demoGaps;
       return json(reply, 200, {
         total: 128,
         configurable: 116,
         skipped: 12,
         playlists: [
-          { id: "streamnet_tv", name: "StreamNet TV", accountCount: 84 },
+          { id: "streamnet_tv", name: "StreamNet TV", accountCount: 116 - gaps.length, missingAccounts: gaps },
           { id: "demo-playlist", name: "Demo-Playlist", accountCount: 32 },
         ],
         addons: [
-          { id: "opensubtitles", name: "OpenSubtitles v3", accountCount: 110 },
+          { id: "opensubtitles", name: "OpenSubtitles v3", accountCount: 110, missingAccounts: [] },
           { id: "demo-addon", name: "Demo-Add-on", accountCount: 72 },
         ],
         catalogs: [

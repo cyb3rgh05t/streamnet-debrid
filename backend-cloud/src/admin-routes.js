@@ -281,16 +281,30 @@ function globalState(rows, mutation) {
     .digest("hex");
 }
 
+// Entries the app itself provides: accounts whose snapshot lacks one of them have never synced it from a device.
+const appOwnedEntries = { playlists: [["streamnet_tv", "StreamNet TV"]], addons: [["opensubtitles", "OpenSubtitles v3"]] };
+const maxMissingAccounts = 300;
+
 function globalSummary(rows, mutation) {
   const addons = new Map();
   const playlists = new Map();
   const catalogs = new Map();
+  const present = { playlists: new Map(), addons: new Map() };
   let configurable = 0;
+  const configurableRows = [];
   for (const row of rows) {
     if (!row.payload) continue;
     const inventory = adminGlobalInventory(row.payload);
     if (!inventory.profileCount) continue;
     configurable += 1;
+    configurableRows.push(row);
+    for (const [kind, items] of [["playlists", inventory.playlists], ["addons", inventory.addons]]) {
+      for (const item of items) {
+        const ids = present[kind].get(item.id) || new Set();
+        ids.add(row.account_id);
+        present[kind].set(item.id, ids);
+      }
+    }
     for (const [map, items] of [
       [addons, inventory.addons],
       [playlists, inventory.playlists],
@@ -303,6 +317,27 @@ function globalSummary(rows, mutation) {
       }
     }
   }
+  const withGaps = (map, kind) => {
+    for (const [id, name] of appOwnedEntries[kind]) {
+      const entry = map.get(id) || { id, name, accountCount: 0 };
+      const have = present[kind].get(id) || new Set();
+      entry.missingAccounts = configurableRows.filter((row) => !have.has(row.account_id))
+        .map((row) => ({
+          id: row.account_id,
+          email: row.email ?? null,
+          createdAt: row.created_at ?? null,
+          lastDeviceSeenAt: row.last_device_seen_at ?? null,
+          snapshotUpdatedAt: row.updated_at ?? null,
+        }))
+        // Accounts that never reported a device first, then the oldest contact.
+        .sort((a, b) => Number(Boolean(a.lastDeviceSeenAt)) - Number(Boolean(b.lastDeviceSeenAt)) ||
+          String(a.lastDeviceSeenAt ?? "").localeCompare(String(b.lastDeviceSeenAt ?? "")))
+        .slice(0, maxMissingAccounts);
+      map.set(id, entry);
+    }
+  };
+  withGaps(playlists, "playlists");
+  withGaps(addons, "addons");
   return {
     total: rows.length,
     configurable,
@@ -358,7 +393,8 @@ async function mdblistListTitle(slug) {
 }
 
 export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
-  const globalAccountsQuery = `select a.id as account_id, s.payload, s.revision, s.updated_at
+  const globalAccountsQuery = `select a.id as account_id, a.email, a.created_at, s.payload, s.revision, s.updated_at,
+      (select max(d.last_seen) from device_presence d where d.account_id = a.id) as last_device_seen_at
     from accounts a left join account_sync_snapshots s on s.account_id = a.id
     order by a.id`;
 
