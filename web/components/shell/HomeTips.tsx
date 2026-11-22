@@ -32,7 +32,6 @@ export function HomeTips() {
     setState(
       loadStored<HomeTipsState>(HOME_TIPS_KEY, {
         dismissed: [],
-        hidden: false,
       }),
     );
   }, []);
@@ -122,15 +121,8 @@ export function HomeTips() {
         <p>{copy[tip].text}</p>
       </div>
       <div className="home-tip-actions">
-        <button type="button" className="secondary" onClick={dismiss}>
+        <button type="button" className="home-tip-ok" onClick={dismiss}>
           {localize(lang, "Alles klar!", "Got it!")}
-        </button>
-        <button
-          type="button"
-          className="home-tip-hide"
-          onClick={() => update({ ...state, hidden: true })}
-        >
-          {localize(lang, "Alle Tipps ausblenden", "Hide all tips")}
         </button>
       </div>
       <button

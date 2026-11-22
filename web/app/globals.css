@@ -14992,12 +14992,25 @@ html {
   align-items: center;
   gap: 14px;
 }
-.home-tip-hide {
-  border: 0;
+.home-tip-ok {
+  min-width: 0;
+  width: auto;
+  height: auto;
+  padding: 9px 20px;
+  border: 1px solid color-mix(in srgb, var(--accent, var(--orange)) 70%, transparent);
+  border-radius: 10px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 12px;
-  text-decoration: underline;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.home-tip-ok:hover,
+.home-tip-ok:focus-visible {
+  background: var(--accent, var(--orange));
+  color: #111;
 }
 .home-tip-close {
   position: absolute;

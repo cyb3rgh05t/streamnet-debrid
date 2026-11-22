@@ -4,7 +4,6 @@ export const HOME_TIP_ORDER: HomeTipId[] = ["rows", "addons", "live_tv", "cloud"
 
 export interface HomeTipsState {
   dismissed: string[];
-  hidden: boolean;
 }
 
 export const HOME_TIPS_KEY = "streamnet.homeTips.v1";
@@ -15,7 +14,6 @@ export function selectHomeTip(
   state: HomeTipsState,
   context: { hasUserAddon: boolean; hasIptvSource: boolean },
 ): HomeTipId | null {
-  if (state.hidden) return null;
   return (
     HOME_TIP_ORDER.find((tip) => {
       if (state.dismissed.includes(tip)) return false;
