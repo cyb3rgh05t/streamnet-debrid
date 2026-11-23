@@ -3495,7 +3495,7 @@ private fun HomeInputLayer(
             if (focusState.isTipFocused && event.type == KeyEventType.KeyDown) {
                 when (event.key) {
                     Key.Enter, Key.DirectionCenter -> {
-                        focusState.isTipFocused = false
+                        // Focus stays on the banner so the next tip can be dismissed right away; it is released once no tip is left.
                         onTipDismiss()
                         return@onPreviewKeyEvent true
                     }
@@ -4327,7 +4327,15 @@ private fun TvHomeRowsLayer(
         }
         // Focusing the tip scrolls it fully into view (row + tip are taller than the viewport); leaving it scrolls back.
         LaunchedEffect(focusState.isTipFocused, showTipUnderFirstRow) {
-            if (!showTipUnderFirstRow) return@LaunchedEffect
+            if (!showTipUnderFirstRow) {
+                // The last tip is gone: undo the scroll that brought it into view so the first row isn't cut off.
+                if (focusState.currentRowIndex == 0 && listState.firstVisibleItemIndex == 0 &&
+                    listState.firstVisibleItemScrollOffset > 0
+                ) {
+                    listState.scrollToItem(0)
+                }
+                return@LaunchedEffect
+            }
             if (focusState.isTipFocused) {
                 val firstRowDp = (if (rowLayoutModes.getOrNull(0) == true) 245.dp else 202.dp) - tipRowTrim
                 val overflowPx = with(density) {

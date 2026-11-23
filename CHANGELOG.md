@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Web 1.0.086] - 2026-11-23
+
+- Web, Live-TV-Programmführer: Neben dem Lade-Spinner steht jetzt der Text „Programmdaten werden geladen …“ (englisch „Loading guide data …“), solange die Programmdaten eines Senders noch geladen werden. Tests: `tsc` ohne Fehler. Nicht geprüft: im Browser.
+
+## [2.6.021] - 2026-11-23
+
+- Android TV, Tipps auf Home: Beim Schließen eines Tipps wird er jetzt in einem Schritt durch den nächsten ersetzt, statt kurz zu verschwinden. Dadurch springt Home nicht mehr und lädt nicht mehr hart neu. Der Fokus bleibt auf dem Tipp, bis der letzte geschlossen ist, sodass man alle Tipps nacheinander mit OK schließen kann, ohne jedes Mal wieder hochzuscrollen. Nach dem letzten Tipp scrollt Home wieder ganz nach oben, die erste Reihe ist nicht mehr halb abgeschnitten. Wiederholtes OK während des Wechsels wird ignoriert. Tests: Home-Unit-Tests grün, Debug-Build erfolgreich. Nicht geprüft: auf dem Emulator/TV (kein Login verfügbar).
 ## [Web 1.0.085] - 2026-11-22
 
 - Web, Live-TV-Programmführer: Solange die Programmdaten eines Senders noch geladen werden, zeigt die Zeile jetzt einen Lade-Spinner statt „Keine Programmdaten“ (ebenso im Detailbereich). „Keine Programmdaten“ erscheint erst, wenn die Abfrage für den Sender abgeschlossen ist und wirklich nichts geliefert hat, auch nach einem Fehler. Der Store merkt sich dafür pro Konto, Profil und Playlist, welche Sender schon abgefragt wurden (`iptvGuideSettled`). Tests: Web 134 von 134, `tsc` ohne Fehler. Nicht geprüft: im Browser mit echten EPG-Daten.

@@ -6176,26 +6176,30 @@ class HomeViewModel @Inject constructor(
     val homeTip: StateFlow<HomeTip?> = _homeTip.asStateFlow()
 
     fun refreshHomeTip() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val prefs = context.settingsDataStore.data.first()
-            val hasUserAddon = streamRepository.installedAddons.first()
-                .any { it.isInstalled && it.isEnabled && it.id != "opensubtitles" }
-            val hasIptvSource = iptvRepository.observeConfig().first().hasConfiguredSource()
-            _homeTip.value = selectHomeTip(
-                dismissedIds = prefs[HOME_TIPS_DISMISSED_KEY].orEmpty(),
-                hasUserAddon = hasUserAddon,
-                hasIptvSource = hasIptvSource,
-            )
-        }
+        viewModelScope.launch(Dispatchers.IO) { _homeTip.value = loadNextHomeTip() }
+    }
+
+    private suspend fun loadNextHomeTip(): HomeTip? {
+        val prefs = context.settingsDataStore.data.first()
+        val hasUserAddon = streamRepository.installedAddons.first()
+            .any { it.isInstalled && it.isEnabled && it.id != "opensubtitles" }
+        val hasIptvSource = iptvRepository.observeConfig().first().hasConfiguredSource()
+        return selectHomeTip(
+            dismissedIds = prefs[HOME_TIPS_DISMISSED_KEY].orEmpty(),
+            hasUserAddon = hasUserAddon,
+            hasIptvSource = hasIptvSource,
+        )
     }
 
     fun dismissHomeTip(tip: HomeTip) {
-        _homeTip.value = null
+        // Ignore repeated clicks while the current tip is still being swapped for the next one.
+        if (_homeTip.value != tip) return
         viewModelScope.launch(Dispatchers.IO) {
             context.settingsDataStore.edit { prefs ->
                 prefs[HOME_TIPS_DISMISSED_KEY] = prefs[HOME_TIPS_DISMISSED_KEY].orEmpty() + tip.id
             }
-            refreshHomeTip()
+            // Replace the tip in one step (no empty gap) so the Home layout doesn't collapse and jump in between.
+            _homeTip.value = loadNextHomeTip()
         }
     }
 
