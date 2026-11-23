@@ -666,10 +666,8 @@ internal suspend fun androidx.compose.foundation.lazy.LazyListState.animateHomeS
         animate(
             initialValue = 0f,
             targetValue = targetDelta,
-            animationSpec = spring(
-                dampingRatio = 0.85f,
-                stiffness = 200f
-            )
+            // A short tween settles in a fixed time; the former soft spring needed ~0.6 s and restarted on every key repeat.
+            animationSpec = tween(durationMillis = durationMillis, easing = FastOutSlowInEasing)
         ) { value, _ ->
             val step = value - previousValue
             if (abs(step) > 0.01f) {
@@ -2298,7 +2296,7 @@ internal fun HeroSection(
     // users see no behavior change. Issue #72.
     showBudget: Boolean = true,
     showCertification: Boolean = true,
-    autoScrollHomeOverview: Boolean = true,
+    autoScrollHomeOverview: Boolean = false,
     overviewMaxHeight: Dp = 72.dp,
     modifier: Modifier = Modifier,
     measurementOnly: Boolean = false
@@ -2696,7 +2694,7 @@ private fun HomeHeroLayer(
     isMobile: Boolean = false,
     showBudget: Boolean = true,
     showCertification: Boolean = true,
-    autoScrollHomeOverview: Boolean = true,
+    autoScrollHomeOverview: Boolean = false,
     onNavigateToDetails: (MediaType, Int, Int?, Int?) -> Unit = { _, _, _, _ -> },
     onNavigateToTv: (channelId: String?, streamUrl: String?) -> Unit = { _, _ -> },
     isIptvItem: (MediaItem) -> Boolean = { false },

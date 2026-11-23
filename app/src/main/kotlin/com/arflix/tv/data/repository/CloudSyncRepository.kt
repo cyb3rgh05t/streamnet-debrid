@@ -1270,7 +1270,7 @@ class CloudSyncRepository @Inject constructor(
                             ?: "Orange",
                         showBudget = prefs[showBudgetKeyFor(profile.id)] ?: true,
                         showCertification = prefs[showCertificationKeyFor(profile.id)] ?: true,
-                        autoScrollHomeOverview = prefs[autoScrollHomeOverviewKeyFor(profile.id)] ?: true,
+                        autoScrollHomeOverview = prefs[autoScrollHomeOverviewKeyFor(profile.id)] ?: false,
                         showEpisodeRatings = prefs[showEpisodeRatingsKeyFor(profile.id)] ?: true,
                         showLoadingStats = prefs[showLoadingStatsKeyFor(profile.id)] ?: true,
                         smoothScrolling = prefs[smoothScrollingKeyFor(profile.id)] ?: true,

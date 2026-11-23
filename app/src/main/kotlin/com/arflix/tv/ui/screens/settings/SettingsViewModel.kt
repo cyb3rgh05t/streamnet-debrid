@@ -147,7 +147,7 @@ data class SettingsUiState(
     val trailerInCards: Boolean = true,
     val showBudget: Boolean = true,
     val showCertification: Boolean = true,
-    val autoScrollHomeOverview: Boolean = true,
+    val autoScrollHomeOverview: Boolean = false,
     val showEpisodeRatings: Boolean = true,
     // Volume boost in decibels (0 = off, up to 15 dB). Applied via system LoudnessEnhancer
     // attached to the ExoPlayer audio session. Issue #88.
@@ -285,7 +285,7 @@ data class SettingsUiState(
     val subtitleAiModel: SubtitleAiModel = SubtitleAiModel.GROQ_LLAMA_70B,
     val subtitleRemoveHearingImpaired: Boolean = true,
     val aiKeyServerState: AiKeyServerState = AiKeyServerState(),
-    val smoothScrolling: Boolean = false,
+    val smoothScrolling: Boolean = true,
     val tvUiScalePercent: Int = 100,
     val tvNavigationSoundEnabled: Boolean = true
 )
@@ -694,7 +694,7 @@ class SettingsViewModel @Inject constructor(
             val spoilerBlurEnabled = prefs[spoilerBlurKey()] ?: false
             val showBudget = prefs[showBudgetKey()] ?: true
             val showCertification = prefs[showCertificationKey()] ?: true
-            val autoScrollHomeOverview = prefs[autoScrollHomeOverviewKey()] ?: true
+            val autoScrollHomeOverview = prefs[autoScrollHomeOverviewKey()] ?: false
             val showEpisodeRatings = prefs[showEpisodeRatingsKey()] ?: true
             val clockFormat = prefs[clockFormatKey()] ?: "24h"
             // One-time migration: read old "focus_border_color" key if new "accent_color" is absent
@@ -716,7 +716,7 @@ class SettingsViewModel @Inject constructor(
             }
             val volumeBoostDb = prefs[volumeBoostDbKey()]?.toIntOrNull()?.coerceIn(0, 15) ?: 0
             val showLoadingStats = prefs[showLoadingStatsKey()] ?: true
-            val smoothScrolling = prefs[smoothScrollingKey()] ?: false
+            val smoothScrolling = prefs[smoothScrollingKey()] ?: true
             val iptvVodSearchEnabled = iptvRepository.isVodSearchEnabled()
 
             val subtitleSize = prefs[subtitleSizeKey()] ?: "Medium"

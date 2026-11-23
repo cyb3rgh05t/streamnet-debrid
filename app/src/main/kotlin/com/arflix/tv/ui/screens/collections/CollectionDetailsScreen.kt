@@ -1184,6 +1184,15 @@ private fun CollectionItemsGrid(
         }
     }
 
+    // The tab bar is the grid's first item; when focus reaches the first card row, scroll back to the top so the tabs show again.
+    val firstRowCount = collectionFirstRowCount(items, gridColumns)
+    LaunchedEffect(focusedMediaIndex, firstRowCount, gridState) {
+        if (focusedMediaIndex !in 0 until firstRowCount) return@LaunchedEffect
+        if (gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 0) {
+            gridState.animateScrollToItem(0)
+        }
+    }
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(gridColumns),
         state = gridState,

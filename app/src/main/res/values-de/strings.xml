@@ -516,7 +516,7 @@
     <string name="ai_key_saved_subtitle">KI-Übersetzung ist einsatzbereit</string>
     <string name="ai_qr_scan_hint">Mit dem Telefon scannen – Groq oder Gemini auswählen</string>
     <string name="smooth_scrolling">Flüssigeres Scrollen</string>
-    <string name="smooth_scrolling_desc">Hochwertige, flüssige Übergänge beim Navigieren durch Posterreihen verwenden</string>
+    <string name="smooth_scrolling_desc">Weiche, kurze Übergänge beim Wechsel zwischen Reihen und Postern mit der Fernbedienung</string>
 
     <!-- Plugins -->
     <string name="plugin_providers_count">%1$d Anbieter</string>

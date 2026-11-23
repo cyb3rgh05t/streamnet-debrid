@@ -161,6 +161,50 @@ Work through these over time, measuring each step where it claims an effect:
 9. Compose 1.12 and newer, Hilt 2.59+: not blocked by a Hilt bug any more, but requires the AGP 9 migration. Low priority until the TV measurement (item 3, see the guide below) shows a recomposition bottleneck. If it is done, use a separate branch, then repeat the smoke tests and the one-press focus checks.
 10. Review the remaining `focusable()` plus click patterns (skip-intro button, variant picker, Live-TV category chip). They also handle OK in `onKeyEvent` and are probably unaffected, but this was only read, not run.
 
+## Android 2.6.022 Smoothness Work (emulator only)
+
+Status: implemented and checked on a 1920x1080 TV-profile emulator only. Nothing here was run on a real TV yet; the next step is to test on real devices and continue from the open points below.
+
+### What changed
+
+- "Smoother scrolling" (per profile) now defaults to on (Settings, Home, Watchlist; the cloud snapshot already assumed on). Before, nobody who never touched it got any scroll animation on Home, so rows and cards jumped. Saved profile values are kept.
+- `animateHomeScrollDelta` (Home rails and rows, Live-TV category chips) used a soft spring (stiffness 200, damping 0.85) and ignored the 115/150/180 ms values passed in. It now runs a tween of that duration with `FastOutSlowInEasing`. The spring needed about 0.6 s to settle and restarted on every key repeat.
+- Hero overview mode defaults to ellipsis instead of auto-scroll for profiles without a stored value (Settings, Home, cloud snapshot).
+- Collections: moving up to the first card row scrolls the grid to the top so the tab bar is visible at once (`CollectionDetailsScreen.kt`).
+- Details (TV): `HomeMatchedDetailsHero` (`TvHeroLayout.kt`) no longer cuts when the header toggles. The body gets its final size at once but is drawn shifted back to its previous top and glides into place (200 ms), while the header fades.
+- Not touched on purpose: Details and Search already animate with tweens; Live-TV channel rails snap by design.
+
+### Emulator measurements (same key sequence, `dumpsys gfxinfo`)
+
+| Run | Janky frames | p99 frame time |
+| --- | --- | --- |
+| Smooth scrolling off (old default) | 3.7 % | 40 ms |
+| On, tween (two runs) | 1.7 % and 1.2 % | 38 ms and 23 ms |
+
+Sequence: 8x Right, 3x Down, 8x Left, 3x Up with 350 to 700 ms gaps. The emulator host is much faster than a TV box, so only the direction of the numbers means anything.
+
+Hero change cost (Streamingdienste row, 10 to 12 presses with 1.5 s gaps, `framestats`, last 120 frames): p99 36 ms going right, 16 ms going left, 30 ms for Down/Up; a 20-key burst at 120 ms: p99 23 ms but 50 of 120 frames above 16.7 ms. `framestats` keeps only the last 120 frames, so each run shows the end of its key sequence.
+
+Perfetto trace (22 s, 6 slow Right, 2 Down, 12 fast Right):
+
+- Main thread: longest frame 33 ms; busy 20 to 200 ms per second. Compose recomposition (`Recomposer:recompose`) about 280 ms in total, `draw` about 485 ms. The hero swap on its own is not a hotspot here.
+- `RenderThread`: `Drawing 0,0,1920,1080` averages 7.7 ms per frame (376 frames), up to 43 ms. Every frame redraws the full screen (backdrop, gradients, video, cards).
+- ExoPlayer: on rows with service videos (Streamingdienste) an MP4 starts as soon as the card is focused. `doSomeWork` and `drainAndFeed` use about 150 ms per second for about 12 s and `MediaCodec_loop` threads add more. Decoders are created per focus change (`createCodec` avc and aac).
+
+### Open points to continue after real-device tests
+
+1. Re-run the TV Measurement Guide below on a real low-end TV with the new defaults (smooth on) against smooth off. Check by hand whether the 150 to 180 ms glide feels right or too slow, and whether a held key stays smooth.
+2. Service-video previews on Home start immediately on focus (`serviceHeroVideoUrl` in `HomeScreen.kt`, "do not delay MP4 previews"). Candidates: start only after about 400 to 500 ms of idle focus; pause while a key is held; skip them on low-RAM devices. This changes the intended behaviour, so decide after the device test.
+3. Full-screen redraw cost (`RenderThread`): fewer overlapping layers (backdrop, scrims, video), smaller backdrop decode, no per-frame alpha layers on weak GPUs. Check GPU rendering with the Perfetto `gfx` category on the TV; the emulator GPU is not representative.
+4. A low-end TV mode (item 5 of the open work above) could group 2 and 3 plus fewer crossfades and less prefetch.
+5. The hero update already waits 360 ms during fast navigation (`HomeScreen.kt`, "Update hero based on focused item"); check on a device whether that delay or the 650 ms fast-scroll threshold feels laggy.
+6. Series Details (seasons and episodes) were not looked at after the header transition change, only a movie (buttons to cast and similar). Check that screen on a device, including Up from the rows back to the buttons.
+
+### How the emulator measurements were taken
+
+- Frame stats: `adb shell dumpsys gfxinfo com.arvio.tv reset`, key events through `adb shell input keyevent` (22 right, 21 left, 20 down, 19 up), then `dumpsys gfxinfo` or `dumpsys gfxinfo com.arvio.tv framestats` (frame time is `FrameCompleted - IntendedVsync` of rows whose first column is `0`).
+- Perfetto: `perfetto -c - --txt -o /data/misc/perfetto-traces/x.pftrace` with `linux.ftrace`, `sched/sched_switch` and `sched/sched_wakeup`, atrace categories `view gfx input am` and `atrace_apps: "com.arvio.tv"`, 22 s. Pulled and read with the Python `perfetto` package (`TraceProcessor`, needs `pandas`). The trace had no process names, so find the app by thread name (`com.arvio.tv` is the main thread, `RenderThread`, `ExoPlayer:Playb`) and query `slice` joined to `thread_track` by `utid`.
+- Frame sequences of a transition: several `screencap` calls in one `adb shell` loop (raw RGBA, 16-byte header, 1920x1080), then a contact sheet with Pillow. Frames are about 200 ms apart, so they show that a transition runs, not how smooth it is.
 ## TV Measurement Guide
 
 Purpose: find out whether 2.6.x is faster than 2.5.099 on a real, weak Android TV, and where the time goes. Nothing below has been run on a TV yet. The cold-start and `gfxinfo` commands of sections 1 and 2 were run once on the emulator and return the fields named there (emulator numbers are not meaningful); the Live-TV pattern, `meminfo`, `exit-info` and Perfetto steps were not run. Run everything from a PC with `adb`.

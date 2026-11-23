@@ -222,7 +222,7 @@ class WatchlistViewModel @Inject constructor(
     )
         .map { it.smoothScrolling }
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
     private val libraryCache = linkedMapOf<String, Pair<List<MediaItem>, Boolean>>()
     private var libraryLoadJob: Job? = null
     private var librarySearchJob: Job? = null

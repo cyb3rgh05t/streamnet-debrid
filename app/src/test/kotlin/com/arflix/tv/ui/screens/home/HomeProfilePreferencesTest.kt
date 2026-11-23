@@ -14,9 +14,9 @@ import org.junit.Test
 class HomeProfilePreferencesTest {
 
     @Test
-    fun `settings and Home agree on disabled scrolling when no value is stored`() {
+    fun `settings and Home agree on enabled scrolling when no value is stored`() {
         val preferences = readHomeProfilePreferences(mutablePreferencesOf(), "primary")
-        assertThat(preferences.smoothScrolling).isFalse()
+        assertThat(preferences.smoothScrolling).isTrue()
         assertThat(SettingsUiState().smoothScrolling).isEqualTo(preferences.smoothScrolling)
         assertThat(HomeUiState().smoothScrolling).isEqualTo(preferences.smoothScrolling)
     }
@@ -96,9 +96,9 @@ class HomeProfilePreferencesTest {
         assertThat(settings.trailerInCards).isTrue()
         assertThat(settings.showBudget).isTrue()
         assertThat(settings.showCertification).isTrue()
-        assertThat(settings.autoScrollHomeOverview).isTrue()
+        assertThat(settings.autoScrollHomeOverview).isFalse()
         assertThat(settings.clockFormat).isEqualTo("24h")
-        assertThat(settings.smoothScrolling).isFalse()
+        assertThat(settings.smoothScrolling).isTrue()
         assertThat(settings.contentLanguage).isEqualTo("en-US")
     }
 
@@ -119,15 +119,15 @@ class HomeProfilePreferencesTest {
         val profileId = MutableStateFlow("primary")
         val preferences = MutableStateFlow<Preferences>(mutablePreferencesOf())
         observeHomeProfilePreferences(profileId, preferences).test {
-            assertThat(awaitItem().autoScrollHomeOverview).isTrue()
+            assertThat(awaitItem().autoScrollHomeOverview).isFalse()
             preferences.value = mutablePreferencesOf(
-                booleanPreferencesKey("profile_primary_auto_scroll_home_overview") to false
+                booleanPreferencesKey("profile_primary_auto_scroll_home_overview") to true
             )
-            assertThat(awaitItem().autoScrollHomeOverview).isFalse()
-            profileId.value = "secondary"
             assertThat(awaitItem().autoScrollHomeOverview).isTrue()
-            profileId.value = "primary"
+            profileId.value = "secondary"
             assertThat(awaitItem().autoScrollHomeOverview).isFalse()
+            profileId.value = "primary"
+            assertThat(awaitItem().autoScrollHomeOverview).isTrue()
             cancelAndIgnoreRemainingEvents()
         }
     }

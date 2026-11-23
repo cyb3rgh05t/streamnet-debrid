@@ -425,7 +425,7 @@ data class HomeUiState(
     // Home hero metadata visibility toggles (issue #72)
     val showBudget: Boolean = true,
     val showCertification: Boolean = true,
-    val autoScrollHomeOverview: Boolean = true,
+    val autoScrollHomeOverview: Boolean = false,
     val heroOverviewOverride: String? = null,
     val cardLogoUrls: Map<String, String> = emptyMap(),
     // Previous hero for crossfade (Phase 2.1)
@@ -447,7 +447,7 @@ data class HomeUiState(
     val hasUpdateBadge: Boolean = false,
     val categoryHasMoreMap: Map<String, Boolean> = emptyMap(),
     val loadingCategoryIds: Set<String> = emptySet(),
-    val smoothScrolling: Boolean = false
+    val smoothScrolling: Boolean = true
 )
 
 internal fun projectHomeForIptvOnlyMode(

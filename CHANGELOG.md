@@ -4,6 +4,15 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.022] - 2026-11-23
+
+- Android TV, Scrollen: „Flüssigeres Scrollen“ ist jetzt standardmäßig an (Home, Merkliste, Einstellungen; gespeicherte Profilwerte bleiben, vorher waren Cloud-Sync und App uneinheitlich). Die Animation von Home-Reihen und Postern nutzt einen kurzen Übergang (150–180 ms, bei gehaltener Taste 115 ms) statt der weichen Feder, die etwa 0,6 s zum Ausschwingen brauchte und bei jedem Tastendruck neu startete; die vorgesehenen Dauern wurden bisher ignoriert. Das gilt auch für die Kategorie-Chips im Live-TV. Beschreibung der Einstellung angepasst. Messung auf dem Emulator (gleiche Tastenfolge, `dumpsys gfxinfo`): ruckelnde Frames 3,7 % → 1,2–1,7 %, 99. Perzentil 40 ms → 23–38 ms. Nicht geprüft: auf echter TV-Hardware.
+- Android TV, Collections/Franchise/Genres: Geht man mit der Pfeil-nach-oben-Taste bis zur ersten Kartenreihe, scrollt die Liste jetzt ganz nach oben, sodass die Tabs (Timeline/Filme/Serien) sofort sichtbar sind. Vorher blieben sie versteckt, bis man ein weiteres Mal nach oben drückte. Auf dem Emulator geprüft (vier Reihen runter, vier hoch).
+- Android TV, Details: Der Wechsel zwischen den Aktionsbuttons und den Reihen darunter (Staffeln, Episoden, Besetzung, Mehr davon) ist jetzt fließend. Beim Verlassen der Buttons blendet der Kopf (Logo, Infos, Beschreibung, Buttons) in 200 ms aus, und die Reihen gleiten an ihre neue Position statt in einem Schritt hochzuspringen; beim Zurückgehen läuft es umgekehrt. Auf dem Emulator geprüft (Film-Details, runter und hoch); Zwischenbilder sichtbar, Endlayout unverändert. Nicht geprüft: Serien-Details mit Staffeln/Episoden und echte TV-Hardware.
+- Android, Home-Beschreibung: Der Standard ist jetzt „Ellipsis“ (gekürzter Text mit …) statt „Auto-Scroll“, solange für das Profil noch kein Wert gespeichert ist (Einstellungen, Home und Cloud-Sync einheitlich). Wer die Einstellung schon gewählt hat, behält sie. Profile, die sie nie geändert haben, bekommen ebenfalls den neuen Standard.
+- Dokumentation: `PERFORMANCE.md` hat einen neuen Abschnitt „Android 2.6.022 Smoothness Work“ mit Änderungen, Emulator-Messungen (gfxinfo, Perfetto), Befunden (Service-Video im Hero, Vollbild-Zeichnen) und den offenen Punkten für den Test auf echten Geräten.
+- Tests: 950 von 950.
+
 ## [Web 1.0.086] - 2026-11-23
 
 - Web, Live-TV-Programmführer: Neben dem Lade-Spinner steht jetzt der Text „Programmdaten werden geladen …“ (englisch „Loading guide data …“), solange die Programmdaten eines Senders noch geladen werden. Tests: `tsc` ohne Fehler. Nicht geprüft: im Browser.
