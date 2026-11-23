@@ -2084,6 +2084,11 @@ function GuideRow({
               )}
             >
               <Loader2 size={16} className="is-spinning" />
+              {localize(
+                settings.uiLanguage,
+                "Programmdaten werden geladen …",
+                "Loading guide data …",
+              )}
             </span>
           ) : (
             <span className="livetv-guide-empty">

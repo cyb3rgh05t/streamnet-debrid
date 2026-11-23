@@ -14112,6 +14112,8 @@ html {
 .livetv-guide-empty.is-loading {
   display: inline-flex;
   align-items: center;
+  gap: 8px;
+  white-space: nowrap;
   color: var(--accent, rgba(255, 255, 255, 0.6));
 }
 
