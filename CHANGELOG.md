@@ -4,6 +4,8 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+- CI, Android-Build: Der Release-Build wird bis zu dreimal versucht (Pause 45 s, 90 s). Der Build von 2.6.024 scheiterte nicht am Code, sondern weil Maven Central dem Runner mit HTTP 429 („Too Many Requests“) Abhängigkeiten verweigerte (kotlinx-coroutines-slf4j, tmdb-java, json u. a.). Die bisherige Wiederholung deckte nur die Plugin-Auflösung ab. Ein neuer Versuch lädt nur noch nach, was fehlt.
+
 ## [Backend 1.0.067] - 2026-11-24
 
 - CI, Backend: Fix für den fehlgeschlagenen Build von 1.0.066. Der Test „dashboard online shortcut…“ führt den Klick-Handler des Online-Filters isoliert aus; seit der Änderung der Account-Suche ruft der Handler `clearAccountSearch()` auf, das im Test fehlte (`clearAccountSearch is not defined`). Der Test stellt es jetzt bereit und prüft zusätzlich, dass die Suche geleert wird. Außerdem erkennt er das Handler-Muster auch bei Windows-Zeilenenden; unter Windows schlug er bisher aus diesem Grund immer fehl, was den echten Fehler verdeckte. Backend-Tests: 193 von 193. Die Anwendung selbst ist unverändert.

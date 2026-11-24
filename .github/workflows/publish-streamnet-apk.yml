@@ -238,8 +238,16 @@ jobs:
           done
           exit 1
 
+      # Maven Central answers 429 (Too Many Requests) when many runners share an address. Retry with a
+      # growing pause; a retry only downloads what is still missing.
       - name: Build release APK
-        run: ./gradlew :app:clean :app:assembleSideloadRelease --no-daemon --stacktrace
+        run: |
+          for attempt in 1 2 3; do
+            ./gradlew :app:clean :app:assembleSideloadRelease --no-daemon --stacktrace && exit 0
+            echo "Release build failed (attempt $attempt); retrying in $((attempt * 45)) s"
+            sleep $((attempt * 45))
+          done
+          exit 1
 
       - name: Verify and package APK
         id: package
