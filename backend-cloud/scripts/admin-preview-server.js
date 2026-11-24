@@ -2,7 +2,8 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { summarizeAdminPayload } from "../src/admin-snapshots.js";
+import { applyAdminSnapshotMutation, summarizeAdminPayload } from "../src/admin-snapshots.js";
+import { profileSettingGroups } from "../src/profile-settings-catalog.js";
 import { catalogIdFor, mdblistListInfo, loadSeed, loadStandards, validateFranchise, validateOverrides } from "../src/catalog-config.js";
 
 // Demo state of the central catalog configuration (not persisted).
@@ -68,6 +69,12 @@ const mimeTypes = {
   ".js": "application/javascript; charset=utf-8",
   ".svg": "image/svg+xml",
 };
+
+// Edits made through the demo UI stay in memory until the server restarts.
+const demoSettingEdits = new Map();
+function withDemoEdits(account) {
+  return { ...buildDemoPayload(account), ...demoSettingEdits.get(account.id) };
+}
 
 function buildDemoPayload(account) {
   const addon = (id, name, type, version, extra = {}) => ({
@@ -203,6 +210,10 @@ function buildDemoPayload(account) {
         "Arrival",
       ]),
       "profile-kids": watchlist(["Klaus"]),
+    },
+    profileSettingsById: {
+      "profile-living-room": { autoPlayNext: false, subtitleSize: "Large", accentColor: "Blue", smoothScrolling: true, trailerDelaySeconds: 3 },
+      "profile-kids": { cardLayoutMode: "Poster" },
     },
     settingsByProfile: {
       "profile-living-room": {
@@ -426,6 +437,19 @@ const server = createServer(async (request, reply) => {
         return json(reply, error.statusCode || 500, { error: error.message });
       }
     }
+    if (request.method === "PATCH" && /^\/admin-api\/accounts\/[^/]+\/snapshot$/.test(url.pathname)) {
+      const account = accounts.find((item) => url.pathname === `/admin-api/accounts/${item.id}/snapshot`);
+      if (!account) return json(reply, 404, { error: "Demo-Account nicht gefunden" });
+      try {
+        const body = await readBody(request);
+        const next = applyAdminSnapshotMutation(withDemoEdits(account), body);
+        demoSettingEdits.set(account.id, { profileSettingsById: next.profileSettingsById, fieldUpdatedAt: next.fieldUpdatedAt });
+        account.revision += 1;
+        return json(reply, 200, { accepted: true, revision: account.revision });
+      } catch (error) {
+        return json(reply, 400, { error: error.message });
+      }
+    }
     if (request.method === "GET" && url.pathname === "/admin-api/global/default-catalogs") {
       return json(reply, 200, { catalogs: [] });
     }
@@ -498,7 +522,7 @@ const server = createServer(async (request, reply) => {
       );
       if (!account)
         return json(reply, 404, { error: "Demo-Account nicht gefunden" });
-      const demoPayload = buildDemoPayload(account);
+      const demoPayload = withDemoEdits(account);
       const device = {
         kind: "app_event",
         removable: false,
@@ -544,6 +568,7 @@ const server = createServer(async (request, reply) => {
             },
           ],
         },
+        settingsCatalog: profileSettingGroups,
         snapshot: {
           revision: account.revision,
           updated_at: account.snapshot_updated_at,

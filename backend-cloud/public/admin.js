@@ -1261,6 +1261,11 @@ async function openAccount(accountId) {
     ),
     metricNode("created", "Erstellt", formatDate(data.account.created_at)),
   );
+  // The revision belongs to the snapshot card.
+  const revisionPill = document.createElement("span");
+  revisionPill.id = "snapshot-revision";
+  revisionPill.className = "revision-pill";
+  stats.children[2].querySelector(".metric-body").append(revisionPill);
 
   const snapshot = data.snapshot;
   byId("snapshot-revision").textContent = snapshot
@@ -1440,8 +1445,8 @@ function populatePlaylistSelect() {
 const accountOperationOptions = [...byId("mutation-operation").options].map(option => option.cloneNode(true));
 
 // Account page tabs: playlists and add-ons share one action form, the others each have a panel of their own.
-const accountTabPanels = { overview: "overview", devices: "devices", playlists: "config", addons: "config", snapshot: "snapshot", audit: "audit", danger: "danger" };
-const accountTabNeedsSnapshot = (tab) => ["playlists", "addons", "snapshot"].includes(tab);
+const accountTabPanels = { overview: "overview", devices: "devices", playlists: "config", addons: "config", settings: "settings", snapshot: "snapshot", audit: "audit", danger: "danger" };
+const accountTabNeedsSnapshot = (tab) => ["playlists", "addons", "settings", "snapshot"].includes(tab);
 
 function selectAccountTab(tab) {
   state.accountTab = tab;
@@ -1457,6 +1462,131 @@ function selectAccountTab(tab) {
     byId("mutation-form").classList.add("hidden");
     renderAccountInventory(tab);
   }
+  if (tab === "settings") renderAccountSettings();
+}
+
+// Remote app settings: one control per setting, saved straight away as a per-profile field change.
+function settingOptionIndex(definition, value) {
+  const index = (definition.options || []).findIndex((option) => option.value === value);
+  return index >= 0 ? index : (definition.options || []).findIndex((option) => option.value === definition.default);
+}
+
+function settingValueLabel(definition, value) {
+  if (definition.type === "boolean") return value ? "An" : "Aus";
+  return definition.options?.[settingOptionIndex(definition, value)]?.label ?? String(value);
+}
+
+async function saveProfileSetting(definition, value, control, row) {
+  const snapshot = state.selectedAccount.snapshot;
+  const profileId = state.settingsProfileId;
+  const accountId = state.selectedAccount.account.id;
+  const settings = ((snapshot.payload.profileSettingsById ??= {})[profileId] ??= {});
+  const previous = Object.hasOwn(settings, definition.field) ? settings[definition.field] : definition.default;
+  control.disabled = true;
+  try {
+    const result = await api(`/admin-api/accounts/${encodeURIComponent(accountId)}/snapshot`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        operation: "set_profile_field",
+        profileId,
+        rootKey: "profileSettingsById",
+        field: definition.field,
+        data: value,
+        expectedRevision: snapshot.revision,
+      }),
+    });
+    snapshot.revision = result.revision;
+    settings[definition.field] = value;
+    byId("snapshot-revision").textContent = `Revision ${result.revision}`;
+    row.classList.remove("is-default");
+    row.classList.add("is-saved");
+    setTimeout(() => row.classList.remove("is-saved"), 1500);
+    showToast(`${definition.label}: ${settingValueLabel(definition, value)}`);
+  } catch (error) {
+    // Put the control back to what is stored.
+    if (definition.type === "boolean") control.checked = Boolean(previous);
+    else control.value = String(settingOptionIndex(definition, previous));
+    showToast(
+      error.status === 409 ? "Der Snapshot wurde inzwischen geändert. Die Ansicht wird neu geladen." : error.message,
+      true,
+    );
+    if (error.status === 409) await openAccount(accountId);
+  } finally {
+    control.disabled = false;
+  }
+}
+
+function renderAccountSettings() {
+  const data = state.selectedAccount;
+  const snapshot = data?.snapshot;
+  const groupsBox = byId("account-settings-groups");
+  const profilesBox = byId("account-settings-profiles");
+  if (!snapshot) {
+    groupsBox.replaceChildren();
+    profilesBox.replaceChildren();
+    return;
+  }
+  const profiles = snapshot.profiles || [];
+  if (!profiles.some((profile) => profile.id === state.settingsProfileId)) state.settingsProfileId = profiles[0]?.id ?? null;
+  profilesBox.replaceChildren(
+    ...(profiles.length > 1
+      ? profiles.map((profile) => {
+        const button = rcElement("button", profile.name, "button secondary");
+        button.type = "button";
+        button.setAttribute("aria-pressed", String(profile.id === state.settingsProfileId));
+        button.addEventListener("click", () => {
+          state.settingsProfileId = profile.id;
+          renderAccountSettings();
+        });
+        return button;
+      })
+      : []),
+  );
+  if (!state.settingsProfileId) {
+    groupsBox.replaceChildren(rcElement("p", "Dieser Account hat kein Profil in der Cloud.", "rc-hint"));
+    return;
+  }
+  const values = snapshot.payload?.profileSettingsById?.[state.settingsProfileId] || {};
+  const cards = (data.settingsCatalog || []).map((group) => {
+    const card = rcElement("div", null, "rc-inv-card settings-group");
+    card.append(rcElement("strong", group.title, "settings-group-title"));
+    for (const definition of group.settings) {
+      const stored = Object.hasOwn(values, definition.field);
+      const current = stored ? values[definition.field] : definition.default;
+      const row = rcElement("div", null, `setting-row${stored ? "" : " is-default"}`);
+      const text = rcElement("div", null, "setting-text");
+      const label = rcElement("strong", definition.label);
+      label.append(rcElement("span", "Standard", "setting-default-tag"));
+      text.append(label);
+      if (definition.hint) text.append(rcElement("small", definition.hint));
+      let control;
+      if (definition.type === "boolean") {
+        control = document.createElement("input");
+        control.type = "checkbox";
+        control.className = "rc-switch";
+        control.checked = Boolean(current);
+        control.setAttribute("aria-label", definition.label);
+        control.addEventListener("change", () => saveProfileSetting(definition, control.checked, control, row));
+      } else {
+        control = document.createElement("select");
+        control.className = "setting-select";
+        control.setAttribute("aria-label", definition.label);
+        definition.options.forEach((option, index) => {
+          const element = document.createElement("option");
+          element.value = String(index);
+          element.textContent = option.label;
+          control.append(element);
+        });
+        control.value = String(settingOptionIndex(definition, current));
+        control.addEventListener("change", () =>
+          saveProfileSetting(definition, definition.options[Number(control.value)].value, control, row));
+      }
+      row.append(text, control);
+      card.append(row);
+    }
+    return card;
+  });
+  groupsBox.replaceChildren(...cards);
 }
 
 function accountChip(text, className = "") {

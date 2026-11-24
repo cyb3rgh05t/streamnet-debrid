@@ -204,6 +204,29 @@ Place an IP allowlist or an interactive access proxy in front of `/admin` and
 `/admin-api` when exposing the production host; do not apply that middleware to
 the Android API routes.
 
+### Moving StreamNet TV to another server from the shell
+
+Instead of the admin panel's global "change host" action, the same change can be run over SSH. It
+moves every profile whose StreamNet TV playlist points at the old host, keeps the credentials and
+sets the same host override as the admin action (so devices that still push the old host are
+corrected on their next sync). Other playlists are not touched. The default run only prints which
+accounts would change (hosts only, no credentials):
+
+```sh
+docker compose exec streamnet-backend npm run migrate:streamnet-host -- \
+  --from xui.streamnet.live --to https://xyzxyz.streamnet.live
+```
+
+Take a database backup first (see the pg_dump command in the upgrade section), then write the change:
+
+```sh
+docker compose exec -e HOST_MIGRATION_BACKUP_CONFIRMED=1 streamnet-backend \
+  npm run migrate:streamnet-host -- --from xui.streamnet.live --to https://xyzxyz.streamnet.live --apply
+```
+
+The run is one transaction and stops without writing if an account changes while it runs. Profiles
+that no longer exist in an account are skipped, as in the admin panel.
+
 ### Remote Config: global playlists, add-ons and catalogs
 
 The **Remote Config** navigation section adds, edits, removes selected entries, or

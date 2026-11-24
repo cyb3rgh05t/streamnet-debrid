@@ -9,6 +9,7 @@ import { verifyScryptPassword } from "./passwords.js";
 import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
 import { deleteAccountData } from "./account-deletion.js";
 import { registerCatalogConfigRoutes } from "./catalog-config.js";
+import { profileSettingGroups } from "./profile-settings-catalog.js";
 import {
   applyAdminSnapshotMutation,
   adminGlobalInventory,

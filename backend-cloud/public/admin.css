@@ -2866,3 +2866,93 @@ tbody tr[data-account-id]:focus .account-primary {
   flex-wrap: wrap;
   gap: 8px;
 }
+/* Account settings tab: remote app options */
+.settings-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 14px;
+  align-items: start;
+  margin-top: 14px;
+}
+.settings-group {
+  gap: 2px;
+}
+.settings-group-title {
+  margin-bottom: 6px;
+  color: var(--accent);
+  font-size: 15px;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 8px;
+  border-top: 1px solid var(--line);
+  border-radius: 6px;
+  transition: background 0.4s ease;
+}
+.setting-row.is-saved {
+  background: var(--accent-soft);
+}
+.setting-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.setting-text strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.setting-text small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.setting-default-tag {
+  display: none;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface-raised);
+  font-size: 10px;
+  font-weight: 500;
+}
+.setting-row.is-default .setting-default-tag {
+  display: inline-block;
+}
+.setting-select {
+  flex: none;
+  width: 190px;
+  min-width: 0;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  background-color: var(--surface-raised);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23e5a209' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  font-size: 13px;
+}
+.setting-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.setting-select:disabled,
+.setting-row .rc-switch:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+@media (max-width: 560px) {
+  .settings-groups {
+    grid-template-columns: 1fr;
+  }
+}
+.metric .revision-pill {
+  align-self: flex-start;
+  min-height: 22px;
+  margin-top: 8px;
+  padding: 0 9px;
+  font-size: 11px;
+}

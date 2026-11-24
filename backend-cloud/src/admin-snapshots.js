@@ -5,6 +5,7 @@ import {
   syncAdminStreamNetHostOverrides,
   xtreamUrls,
 } from "./streamnet-host-overrides.js";
+import { validateProfileSettingValue } from "./profile-settings-catalog.js";
 
 const blockedPropertyNames = new Set(["__proto__", "constructor", "prototype"]);
 const sensitivePropertyPattern =
@@ -621,6 +622,7 @@ export function applyAdminSnapshotMutation(
     }
     const clonedValue = cloneJson(data, "Field data");
     assertSafeKeys(clonedValue);
+    if (rootKey === "profileSettingsById") validateProfileSettingValue(field, clonedValue);
     objectAt(payload, rootKey, profileId)[field] = clonedValue;
     stampFieldUpdatedAt(payload, rootKey, profileId, field, now);
   } else {
