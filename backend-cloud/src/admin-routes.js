@@ -1044,6 +1044,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
           })),
         ],
       },
+      settingsCatalog: profileSettingGroups,
       snapshot: account.payload
         ? {
             revision: Number(account.revision),

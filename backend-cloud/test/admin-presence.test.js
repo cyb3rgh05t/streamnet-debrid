@@ -64,6 +64,16 @@ test("device details distinguish live, expired and unsupported clients; analytic
   assert.match(sql, /presence.install_id = app_usage_events.install_id/);
 });
 
+test("account details carry the remote settings catalog the settings tab renders from", async t => {
+  const { app, headers } = await fixture(t);
+  const response = await app.inject({ url: `/admin-api/accounts/${accountId}`, headers });
+  assert.equal(response.statusCode, 200);
+  const catalog = response.json().settingsCatalog;
+  assert.ok(Array.isArray(catalog) && catalog.length > 0);
+  const fields = catalog.flatMap(group => group.settings.map(setting => setting.field));
+  assert.ok(fields.includes("autoPlayNext") && fields.includes("subtitleSize"));
+});
+
 test("removal deletes presence and analytics, while offline cleanup excludes recent heartbeats", async t => {
   const { app, headers, queries } = await fixture(t);
   for (const suffix of ["offline", "install-a"]) {

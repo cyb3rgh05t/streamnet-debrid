@@ -4,6 +4,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.061] - 2026-11-24
+
+- Adminpanel, Einzel-Account: Fix für 1.0.060. Der Tab „Einstellungen“ blieb leer, weil die Server-Antwort für einen Account die Einstellungsliste nicht enthielt (nur der Demo-Server lieferte sie). Die Antwort enthält sie jetzt; ein neuer Test prüft das an der echten Route (ohne den Fix rot). Fehlt die Liste trotzdem, zeigt die Oberfläche einen Hinweis statt einer leeren Seite.
+
 ## [Web 1.0.087] - 2026-11-24
 
 - Web, Live-TV-Programmführer: Beim Laden der Programmdaten ist nur der Spinner in der Akzentfarbe; der Text daneben hat jetzt eine normale, helle Farbe.

@@ -1547,6 +1547,10 @@ function renderAccountSettings() {
     return;
   }
   const values = snapshot.payload?.profileSettingsById?.[state.settingsProfileId] || {};
+  if (!data.settingsCatalog?.length) {
+    groupsBox.replaceChildren(rcElement("p", "Die Einstellungsliste fehlt in der Server-Antwort. Das Backend ist vermutlich älter als diese Oberfläche und muss aktualisiert werden.", "rc-hint"));
+    return;
+  }
   const cards = (data.settingsCatalog || []).map((group) => {
     const card = rcElement("div", null, "rc-inv-card settings-group");
     card.append(rcElement("strong", group.title, "settings-group-title"));
