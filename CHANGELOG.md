@@ -4,6 +4,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.067] - 2026-11-24
+
+- CI, Backend: Fix für den fehlgeschlagenen Build von 1.0.066. Der Test „dashboard online shortcut…“ führt den Klick-Handler des Online-Filters isoliert aus; seit der Änderung der Account-Suche ruft der Handler `clearAccountSearch()` auf, das im Test fehlte (`clearAccountSearch is not defined`). Der Test stellt es jetzt bereit und prüft zusätzlich, dass die Suche geleert wird. Außerdem erkennt er das Handler-Muster auch bei Windows-Zeilenenden; unter Windows schlug er bisher aus diesem Grund immer fehl, was den echten Fehler verdeckte. Backend-Tests: 193 von 193. Die Anwendung selbst ist unverändert.
+
 ## [Backend 1.0.066] - 2026-11-24
 
 - Adminpanel, Verlauf: „Weiterschauen“ zeigt jetzt wie der Verlauf ein Badge „Film“ oder „Serie“. In beiden Karten sind diese Badges in der Akzentfarbe.

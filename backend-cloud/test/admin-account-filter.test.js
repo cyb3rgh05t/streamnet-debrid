@@ -58,15 +58,18 @@ test("changed filters, pagination and auth invalidate pending account responses"
   }
 });
 
-test("dashboard online shortcut always enables the filter, even after repeated clicks", () => {
-  const handler = source.match(/item\.addEventListener\("click", \(\) => \{\n        state\.onlineOnly[^]*?\n      \}\);/)[0];
+test("dashboard online shortcut always enables the filter and clears the search, even after repeated clicks", () => {
+  const handler = source.match(/item\.addEventListener\("click", \(\) => \{\r?\n\s+state\.onlineOnly[^]*?\r?\n\s+\}\);/)[0];
   const state = { onlineOnly: true, accounts: { offset: 20 } };
   const views = [];
-  const context = vm.createContext({ state, selectView: view => views.push(view), item: {
+  let searchClears = 0;
+  const context = vm.createContext({ state, selectView: view => views.push(view), clearAccountSearch: () => { searchClears++; state.accounts.offset = 0; }, item: {
     addEventListener: (_event, fn) => { fn(); fn(); },
   } });
   vm.runInContext(handler, context);
   assert.equal(state.onlineOnly, true);
   assert.equal(state.accounts.offset, 0);
+  assert.equal(searchClears, 2);
   assert.deepEqual(views, ["accounts", "accounts"]);
 });
+
