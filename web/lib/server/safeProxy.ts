@@ -331,12 +331,25 @@ export async function safeProxyFetch(
 }
 
 const requests = new Map<string, { start: number; count: number }>();
-export function withinProxyBudget(key: string, now = Date.now()) {
+export function withinProxyBudget(key: string, now = Date.now(), limit = 180) {
   const previous = requests.get(key);
   if (!previous || now - previous.start >= 60_000) {
     if (requests.size >= 4000) requests.delete(requests.keys().next().value!);
     requests.set(key, { start: now, count: 1 });
     return true;
   }
-  return ++previous.count <= 180;
+  return ++previous.count <= limit;
+}
+
+/**
+ * Identifies the calling client for rate limiting. The Netlify header is only present on Netlify;
+ * behind Cloudflare/Traefik the others apply. Without any of them every visitor would share one
+ * "local" bucket, so one viewer's segment requests could throttle everybody else.
+ */
+export function clientIdentity(headers: Headers): string {
+  for (const name of ["cf-connecting-ip", "x-nf-client-connection-ip", "x-real-ip", "x-forwarded-for"]) {
+    const value = headers.get(name)?.split(",")[0]?.trim();
+    if (value) return value.slice(0, 64);
+  }
+  return "local";
 }

@@ -856,7 +856,7 @@ textarea {
 .custom-select-trigger.open,
 .custom-select-trigger:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: none;
   outline: none;
 }
 .custom-select-trigger:disabled {
@@ -2948,11 +2948,29 @@ tbody tr[data-account-id]:focus .account-primary {
   background-position: right 12px center;
   font-size: 13px;
 }
-.setting-select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.setting-row .custom-select {
+  flex: none;
+  width: 190px;
 }
-.setting-select:disabled,
+.setting-row .custom-select-trigger {
+  padding-top: 7px;
+  padding-bottom: 7px;
+  font-size: 13px;
+}
+.setting-row .custom-select-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.setting-row .custom-select-option {
+  padding: 7px 10px;
+  font-size: 13px;
+}
+.setting-row .custom-select-list {
+  z-index: 50;
+}
+.setting-row .custom-select-trigger:disabled,
 .setting-row .rc-switch:disabled {
   opacity: 0.5;
   cursor: progress;
@@ -3012,7 +3030,7 @@ tbody tr[data-account-id]:focus .account-primary {
   background: var(--surface-raised);
 }
 .history-poster.is-empty {
-  visibility: hidden;
+  border: 1px solid var(--line);
 }
 .history-body {
   display: grid;

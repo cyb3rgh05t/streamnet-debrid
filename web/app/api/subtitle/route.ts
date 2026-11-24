@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { safeProxyFetch, withinProxyBudget } from "@/lib/server/safeProxy";
+import { clientIdentity, safeProxyFetch, withinProxyBudget } from "@/lib/server/safeProxy";
 
 export async function GET(request: NextRequest) {
-  if (!withinProxyBudget(request.headers.get("x-nf-client-connection-ip") ?? "local")) {
+  if (!withinProxyBudget(clientIdentity(request.headers))) {
     return NextResponse.json({ error: "Subtitle request limit reached. Please wait." }, { status: 429, headers: { "retry-after": "60", "cache-control": "no-store" } });
   }
   const raw = new URL(request.url).searchParams.get("url");

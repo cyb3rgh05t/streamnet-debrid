@@ -11,6 +11,7 @@ import { isStreamNetRelayHost } from "@/lib/iptvPlayback";
 import { verifyRelaySignature } from "@/lib/server/relaySignature";
 import {
   allowsMediaProxy,
+  clientIdentity,
   safeProxyFetch,
   withinProxyBudget,
 } from "@/lib/server/safeProxy";
@@ -18,16 +19,11 @@ import {
 const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
 const ALLOW_MEDIA_PROXY = allowsMediaProxy();
 
+// Signed relay segments and playlists of one live stream need far more requests than API calls.
+const RELAY_REQUESTS_PER_MINUTE = 900;
+
 export async function GET(request: NextRequest) {
-  if (
-    !withinProxyBudget(
-      request.headers.get("x-nf-client-connection-ip") ?? "local",
-    )
-  )
-    return NextResponse.json(
-      { error: "Proxy request limit reached. Please wait." },
-      { status: 429, headers: { "retry-after": "60" } },
-    );
+  const client = clientIdentity(request.headers);
   const input = new URL(request.url);
   const raw = input.searchParams.get("url");
   if (!raw) return NextResponse.json({ error: "Missing url" }, { status: 400 });
@@ -54,6 +50,15 @@ export async function GET(request: NextRequest) {
     target.toString(),
     input.searchParams.get("sig"),
   );
+  if (
+    signedRelayTarget
+      ? !withinProxyBudget(`relay:${client}`, Date.now(), RELAY_REQUESTS_PER_MINUTE)
+      : !withinProxyBudget(client)
+  )
+    return NextResponse.json(
+      { error: "Proxy request limit reached. Please wait." },
+      { status: 429, headers: { "retry-after": "60" } },
+    );
   const streamNetRelayRequest =
     (rewriteMode === "streamnet" || rewriteMode === "resolver") &&
     (isStreamNetRelayHost(target.hostname, STREAMNET_RELAY_HOSTS) ||
@@ -244,11 +249,7 @@ function cacheIptvCatalog(headers: Headers, target: URL) {
 }
 
 export async function POST(request: NextRequest) {
-  if (
-    !withinProxyBudget(
-      request.headers.get("x-nf-client-connection-ip") ?? "local",
-    )
-  )
+  if (!withinProxyBudget(clientIdentity(request.headers)))
     return NextResponse.json(
       { error: "Proxy request limit reached. Please wait." },
       { status: 429, headers: { "retry-after": "60" } },

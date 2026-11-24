@@ -126,9 +126,15 @@ function enhanceSelect(select) {
       trigger.focus();
     }
   });
-  document.addEventListener("click", (event) => {
+  // Lists are re-rendered often; drop the listener once its dropdown has left the page.
+  const closeOnOutsideClick = (event) => {
+    if (!wrapper.isConnected) {
+      document.removeEventListener("click", closeOnOutsideClick);
+      return;
+    }
     if (!wrapper.contains(event.target)) closeList();
-  });
+  };
+  document.addEventListener("click", closeOnOutsideClick);
 
   new MutationObserver(syncTrigger).observe(select, {
     childList: true,
@@ -1560,6 +1566,7 @@ function settingsCard(group, values) {
         saveProfileSetting(definition, definition.options[Number(control.value)].value, control, row));
     }
     row.append(text, control);
+    if (control.tagName === "SELECT") enhanceSelect(control);
     card.append(row);
   }
   return card;
@@ -1627,14 +1634,24 @@ function formatClock(seconds) {
   return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
+// Android stores a full image URL, the web and the database a bare TMDB path; show both as a small poster.
+function tmdbPosterUrl(value) {
+  if (typeof value !== "string") return null;
+  const match = /^(?:https:\/\/image\.tmdb\.org\/t\/p\/(?:w\d+|original))?(\/[\w.-]+)$/.exec(value.trim());
+  return match ? `https://image.tmdb.org/t/p/w154${match[1]}` : null;
+}
+
 function historyRow({ title, subtitle, posterPath, percent, position, duration, updatedAt, chips = [] }) {
   const row = rcElement("div", null, "history-row");
   const poster = document.createElement("img");
   poster.className = "history-poster";
   poster.alt = "";
   poster.loading = "lazy";
-  if (posterPath && /^\/[\w.-]+$/.test(posterPath)) poster.src = `https://image.tmdb.org/t/p/w92${posterPath}`;
-  else poster.classList.add("is-empty");
+  const posterUrl = tmdbPosterUrl(posterPath);
+  if (posterUrl) {
+    poster.src = posterUrl;
+    poster.addEventListener("error", () => poster.classList.add("is-empty"), { once: true });
+  } else poster.classList.add("is-empty");
   const body = rcElement("div", null, "history-body");
   const head = rcElement("div", null, "history-head");
   head.append(rcElement("strong", title || "Unbekannter Titel"));

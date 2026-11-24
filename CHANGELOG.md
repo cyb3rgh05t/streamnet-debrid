@@ -4,6 +4,18 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.064] - 2026-11-24
+
+- Adminpanel, Einstellungen: Die Auswahlfelder sind jetzt die eigenen Dropdowns der Oberfläche statt der nativen Browser-Liste (Akzentfarbe, abgerundete Liste, gewählter Eintrag hervorgehoben, Bedienung mit Tastatur). Der doppelte Rahmen bei aktivem Feld ist weg: Es bleibt nur der Akzent-Rahmen, der zusätzliche Leuchtring entfällt bei allen Dropdowns im Adminpanel. Schrift und Höhe sind an die Zeilen angepasst, lange Einträge werden gekürzt statt umgebrochen.
+
+- Adminpanel, Verlauf: Poster fehlten bei fast allen Einträgen. Android speichert `posterPath` als volle TMDB-Adresse (`https://image.tmdb.org/t/p/w780/…`), das Panel akzeptierte nur reine Pfade (`/abc.jpg`). Beide Formen werden jetzt erkannt und als kleines Poster geladen; nur Adressen von `image.tmdb.org` sind erlaubt. Ohne Poster oder bei Ladefehler erscheint ein dezenter leerer Rahmen statt einer Lücke. Im Demo-Server geprüft (Adresse und Pfad ergeben die richtige URL); nicht geprüft: echte Poster von TMDB im Browser, da der Test-Browser externe Bilder blockiert.
+
+## [Web 1.0.089] - 2026-11-24
+
+- Web, Live-TV-Audioumwandlung (`/api/transcode/audio`): Der Wechsel auf die AAC-Umwandlung (wenn der Browser keinen Ton decodiert) startet schneller. ffmpeg analysierte den Live-Eingang bisher 5 s lang; bei Echtzeit-Eingang entspricht das der Wartezeit bis zum ersten Byte. Mit 2 s Analyse und 2 MB Probe-Größe: im Test mit einem Echtzeit-Teststream (H.264 1080p, AAC-LC 48 kHz) 5,2 s auf 1,8 s bis zum ersten Byte, A/V-Versatz unverändert (−0,04 s). Getestet wurde auch eine aggressivere Variante mit `nobuffer`/`muxdelay 0`; sie ergab einen A/V-Versatz von 1,4 bis 2 s und wurde deshalb verworfen. Nur der Pfad für Nicht-HLS-Eingänge (Live-TS über Pipe) ist geändert; der HLS-Pfad nicht. Nicht geprüft: mit echten Provider-Streams und im Browser.
+
+- Web, Proxy (Live TV, Untertitel): Das Anfrage-Limit des Proxys galt bisher für alle Nutzer zusammen. Die Route las nur den Netlify-Header `x-nf-client-connection-ip`; hinter Cloudflare/Traefik fehlt er, daher teilten sich alle Besucher einen Topf von 180 Anfragen pro Minute. Ein Livestream braucht je Segment und Playlist-Aktualisierung schon einen Teil davon, dazu kommen Senderlogos, EPG und Untertitel – bei mehreren Zuschauern drohten Fehler 429 („Proxy request limit reached“) und damit Buffern oder Senderwechsel durch die Fehlerbehandlung. Jetzt zählt das Limit pro Client (`cf-connecting-ip`, dann `x-nf-client-connection-ip`, `x-real-ip`, erster `x-forwarded-for`-Eintrag); signierte Relay-Segmente und -Playlists haben einen eigenen Topf von 900 pro Minute und Client. Neue Tests; Web-Tests 139 von 139, `tsc` ohne Fehler. Nicht geprüft: auf dem Server mit echten Streams. Ob dies dein Buffern erklärt, ist offen: Im Log von dir steht kein Fehler 429.
+
 ## [Backend 1.0.063] - 2026-11-24
 
 - Adminpanel, Einstellungen: Die Karten einer Zeile sind jetzt gleich hoch (vorher passte sich jede Karte ihrem Inhalt an). Die Einträge stehen weiter oben in der Karte. Im Demo-Server geprüft.

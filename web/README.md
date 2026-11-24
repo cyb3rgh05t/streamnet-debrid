@@ -228,8 +228,11 @@ still requires a responsive app API. Deploy both the updated web image and
 resolver, then reload the channel. A worker-only deployment does not enable the
 app-first behavior. Validate actual playback from the deployed web server.
 
-Existing proxy request budgets remain unchanged: 180 requests per minute per
-bucket. The route uses `x-nf-client-connection-ip` or the shared `local` bucket;
-self-hosted traffic without that header shares one budget. A 10 Gbps link alone
-does not remove this concurrency limit. Review trusted client identification and
-rate-limit policy separately before increasing the viewer count.
+Proxy request budgets are per client: 180 requests per minute for ordinary
+proxy calls and 900 per minute for signed relay segments and playlists (a live
+stream alone needs well over 30 requests per minute). The client is identified by
+`cf-connecting-ip`, `x-nf-client-connection-ip`, `x-real-ip` or the first
+`x-forwarded-for` entry, in that order (`clientIdentity` in `lib/server/safeProxy.ts`).
+Before Web 1.0.088 only the Netlify header was read, so self-hosted traffic behind
+Cloudflare/Traefik shared one `local` budget across all viewers. These headers can be
+spoofed when the origin is reachable directly; keep it behind the reverse proxy.
