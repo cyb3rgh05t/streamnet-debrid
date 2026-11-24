@@ -69,6 +69,8 @@ import com.arflix.tv.util.DeviceType
 import com.arflix.tv.util.DEVICE_MODE_OVERRIDE_KEY
 import com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY
 import com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY
+import com.arflix.tv.util.ProfileSettingName
+import com.arflix.tv.util.readProfileBoolean
 import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.util.LocalHasTouchScreen
 import com.arflix.tv.util.LocalAppLanguage
@@ -344,15 +346,24 @@ class MainActivity : ComponentActivity() {
                 }
                 skipProfileSelection = skipSelection
             }
-            val oledBlackBackground by remember {
-                this@MainActivity.settingsDataStore.data.map { it[OLED_BLACK_BACKGROUND_KEY] ?: false }
-            }.collectAsStateWithLifecycle(initialValue = false)
-            val accentGradientBackground by remember {
-                this@MainActivity.settingsDataStore.data.map { it[com.arflix.tv.util.ACCENT_GRADIENT_BACKGROUND_KEY] ?: false }
-            }.collectAsStateWithLifecycle(initialValue = false)
             val activeProfileId by remember {
                 profileRepository.get().activeProfileId
             }.collectAsStateWithLifecycle(initialValue = null)
+            val oledBlackBackground by remember(activeProfileId) {
+                this@MainActivity.settingsDataStore.data.map {
+                    readProfileBoolean(
+                        it, activeProfileId, ProfileSettingName.OLED_BLACK_BACKGROUND, OLED_BLACK_BACKGROUND_KEY, false
+                    )
+                }
+            }.collectAsStateWithLifecycle(initialValue = false)
+            val accentGradientBackground by remember(activeProfileId) {
+                this@MainActivity.settingsDataStore.data.map {
+                    readProfileBoolean(
+                        it, activeProfileId, ProfileSettingName.ACCENT_GRADIENT_BACKGROUND,
+                        com.arflix.tv.util.ACCENT_GRADIENT_BACKGROUND_KEY, false
+                    )
+                }
+            }.collectAsStateWithLifecycle(initialValue = false)
             val accentColorName by remember(activeProfileId) {
                 this@MainActivity.settingsDataStore.data.map { preferences ->
                     readProfileAccentColor(preferences, activeProfileId)

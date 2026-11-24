@@ -312,6 +312,33 @@ test("an Android home server value still maps to web settings", async () => {
   );
 });
 
+test("OLED and subtitle filters are per profile and the root value is only a fallback", async (t) => {
+  const { pullCloudPayload, invalidateRawPayloadCache } = await import(moduleUrl);
+  const auth = {
+    session: { userId: "per-profile-oled", accessToken: "test-token" },
+    accessToken: async () => "test-token",
+  };
+  const pull = async (payload, profileId) => {
+    invalidateRawPayloadCache();
+    t.mock.method(globalThis, "fetch", async () => Response.json({ revision: 1, payload }));
+    return (await pullCloudPayload(auth, profileId)).settings;
+  };
+  const payload = {
+    oledBlackBackground: true,
+    subtitleRemoveHearingImpaired: true,
+    profileSettingsById: {
+      kids: { oledBlackBackground: false, subtitleRemoveHearingImpaired: false },
+      adult: { oledBlackBackground: true },
+    },
+  };
+  const kids = await pull(payload, "kids");
+  assert.equal(kids.oledBlack, false);
+  assert.equal(kids.removeHearingImpaired, false);
+  assert.equal((await pull(payload, "adult")).oledBlack, true);
+  // A profile without its own value still falls back to the device-wide root value.
+  assert.equal((await pull(payload, "guest")).oledBlack, true);
+});
+
 test("the streaming region syncs between Android and web and a missing value leaves the web choice alone", async () => {
   const { settingsFromAndroidProfile } = await import(moduleUrl);
 

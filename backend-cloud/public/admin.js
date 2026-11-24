@@ -7,6 +7,7 @@ const state = {
   onlineOnly: false,
   audits: { limit: 10, offset: 0, total: 0 },
   accountAudits: { limit: 10, offset: 0, total: 0 },
+  history: { profile: "", limit: 25, offset: 0, total: 0 },
   global: null,
 };
 
@@ -1285,6 +1286,7 @@ async function openAccount(accountId) {
   // A refresh after an action keeps the tab; opening another account starts on the overview.
   selectAccountTab(sameAccount && (snapshot || !accountTabNeedsSnapshot(state.accountTab)) ? state.accountTab : "overview");
   state.accountAudits.offset = 0;
+  if (!sameAccount) state.history = { profile: "", limit: 25, offset: 0, total: 0 };
   await loadAccountAudits(data.account.id);
 }
 
@@ -1445,7 +1447,7 @@ function populatePlaylistSelect() {
 const accountOperationOptions = [...byId("mutation-operation").options].map(option => option.cloneNode(true));
 
 // Account page tabs: playlists and add-ons share one action form, the others each have a panel of their own.
-const accountTabPanels = { overview: "overview", devices: "devices", playlists: "config", addons: "config", settings: "settings", snapshot: "snapshot", audit: "audit", danger: "danger" };
+const accountTabPanels = { overview: "overview", devices: "devices", playlists: "config", addons: "config", history: "history", settings: "settings", snapshot: "snapshot", audit: "audit", danger: "danger" };
 const accountTabNeedsSnapshot = (tab) => ["playlists", "addons", "settings", "snapshot"].includes(tab);
 
 function selectAccountTab(tab) {
@@ -1463,6 +1465,7 @@ function selectAccountTab(tab) {
     renderAccountInventory(tab);
   }
   if (tab === "settings") renderAccountSettings();
+  if (tab === "history") renderHistoryTab().catch((error) => showToast(error.message, true));
 }
 
 // Remote app settings: one control per setting, saved straight away as a per-profile field change.
@@ -1478,22 +1481,27 @@ function settingValueLabel(definition, value) {
 
 async function saveProfileSetting(definition, value, control, row) {
   const snapshot = state.selectedAccount.snapshot;
+  const accountWide = definition.scope === "account";
   const profileId = state.settingsProfileId;
   const accountId = state.selectedAccount.account.id;
-  const settings = ((snapshot.payload.profileSettingsById ??= {})[profileId] ??= {});
+  const settings = accountWide ? snapshot.payload : ((snapshot.payload.profileSettingsById ??= {})[profileId] ??= {});
   const previous = Object.hasOwn(settings, definition.field) ? settings[definition.field] : definition.default;
   control.disabled = true;
   try {
     const result = await api(`/admin-api/accounts/${encodeURIComponent(accountId)}/snapshot`, {
       method: "PATCH",
-      body: JSON.stringify({
-        operation: "set_profile_field",
-        profileId,
-        rootKey: "profileSettingsById",
-        field: definition.field,
-        data: value,
-        expectedRevision: snapshot.revision,
-      }),
+      body: JSON.stringify(
+        accountWide
+          ? { operation: "set_account_setting", field: definition.field, data: value, expectedRevision: snapshot.revision }
+          : {
+            operation: "set_profile_field",
+            profileId,
+            rootKey: "profileSettingsById",
+            field: definition.field,
+            data: value,
+            expectedRevision: snapshot.revision,
+          },
+      ),
     });
     snapshot.revision = result.revision;
     settings[definition.field] = value;
@@ -1516,81 +1524,211 @@ async function saveProfileSetting(definition, value, control, row) {
   }
 }
 
+function settingsCard(group, values) {
+  const card = rcElement("div", null, "rc-inv-card settings-group");
+  card.append(rcElement("strong", group.title, "settings-group-title"));
+  for (const base of group.settings) {
+    const definition = { ...base, scope: group.scope || "profile" };
+    const stored = Object.hasOwn(values, definition.field);
+    const current = stored ? values[definition.field] : definition.default;
+    const row = rcElement("div", null, `setting-row${stored ? "" : " is-default"}`);
+    const text = rcElement("div", null, "setting-text");
+    const label = rcElement("strong", definition.label);
+    label.append(rcElement("span", "Standard", "setting-default-tag"));
+    text.append(label);
+    if (definition.hint) text.append(rcElement("small", definition.hint));
+    let control;
+    if (definition.type === "boolean") {
+      control = document.createElement("input");
+      control.type = "checkbox";
+      control.className = "rc-switch";
+      control.checked = Boolean(current);
+      control.setAttribute("aria-label", definition.label);
+      control.addEventListener("change", () => saveProfileSetting(definition, control.checked, control, row));
+    } else {
+      control = document.createElement("select");
+      control.className = "setting-select";
+      control.setAttribute("aria-label", definition.label);
+      definition.options.forEach((option, index) => {
+        const element = document.createElement("option");
+        element.value = String(index);
+        element.textContent = option.label;
+        control.append(element);
+      });
+      control.value = String(settingOptionIndex(definition, current));
+      control.addEventListener("change", () =>
+        saveProfileSetting(definition, definition.options[Number(control.value)].value, control, row));
+    }
+    row.append(text, control);
+    card.append(row);
+  }
+  return card;
+}
+
 function renderAccountSettings() {
   const data = state.selectedAccount;
   const snapshot = data?.snapshot;
   const groupsBox = byId("account-settings-groups");
-  const profilesBox = byId("account-settings-profiles");
+  byId("account-settings-profiles").replaceChildren();
   if (!snapshot) {
     groupsBox.replaceChildren();
-    profilesBox.replaceChildren();
     return;
   }
-  const profiles = snapshot.profiles || [];
-  if (!profiles.some((profile) => profile.id === state.settingsProfileId)) state.settingsProfileId = profiles[0]?.id ?? null;
-  profilesBox.replaceChildren(
-    ...(profiles.length > 1
-      ? profiles.map((profile) => {
-        const button = rcElement("button", profile.name, "button secondary");
-        button.type = "button";
-        button.setAttribute("aria-pressed", String(profile.id === state.settingsProfileId));
-        button.addEventListener("click", () => {
-          state.settingsProfileId = profile.id;
-          renderAccountSettings();
-        });
-        return button;
-      })
-      : []),
-  );
-  if (!state.settingsProfileId) {
-    groupsBox.replaceChildren(rcElement("p", "Dieser Account hat kein Profil in der Cloud.", "rc-hint"));
-    return;
-  }
-  const values = snapshot.payload?.profileSettingsById?.[state.settingsProfileId] || {};
   if (!data.settingsCatalog?.length) {
     groupsBox.replaceChildren(rcElement("p", "Die Einstellungsliste fehlt in der Server-Antwort. Das Backend ist vermutlich älter als diese Oberfläche und muss aktualisiert werden.", "rc-hint"));
     return;
   }
-  const cards = (data.settingsCatalog || []).map((group) => {
-    const card = rcElement("div", null, "rc-inv-card settings-group");
-    card.append(rcElement("strong", group.title, "settings-group-title"));
-    for (const definition of group.settings) {
-      const stored = Object.hasOwn(values, definition.field);
-      const current = stored ? values[definition.field] : definition.default;
-      const row = rcElement("div", null, `setting-row${stored ? "" : " is-default"}`);
-      const text = rcElement("div", null, "setting-text");
-      const label = rcElement("strong", definition.label);
-      label.append(rcElement("span", "Standard", "setting-default-tag"));
-      text.append(label);
-      if (definition.hint) text.append(rcElement("small", definition.hint));
-      let control;
-      if (definition.type === "boolean") {
-        control = document.createElement("input");
-        control.type = "checkbox";
-        control.className = "rc-switch";
-        control.checked = Boolean(current);
-        control.setAttribute("aria-label", definition.label);
-        control.addEventListener("change", () => saveProfileSetting(definition, control.checked, control, row));
-      } else {
-        control = document.createElement("select");
-        control.className = "setting-select";
-        control.setAttribute("aria-label", definition.label);
-        definition.options.forEach((option, index) => {
-          const element = document.createElement("option");
-          element.value = String(index);
-          element.textContent = option.label;
-          control.append(element);
-        });
-        control.value = String(settingOptionIndex(definition, current));
-        control.addEventListener("change", () =>
-          saveProfileSetting(definition, definition.options[Number(control.value)].value, control, row));
-      }
-      row.append(text, control);
-      card.append(row);
+  const profiles = snapshot.profiles || [];
+  if (!profiles.some((profile) => profile.id === state.settingsProfileId)) state.settingsProfileId = profiles[0]?.id ?? null;
+  const sectionHead = (title, hint) => {
+    const head = rcElement("div", null, "settings-section-head");
+    head.append(rcElement("h3", title, "rc-heading"));
+    if (hint) head.append(rcElement("p", hint, "rc-hint"));
+    return head;
+  };
+  const nodes = [];
+  const accountGroups = data.settingsCatalog.filter((group) => group.scope === "account");
+  if (accountGroups.length) {
+    nodes.push(sectionHead("Für den ganzen Account", "Netzwerk- und Gerätewerte, die nicht zu einem einzelnen Profil gehören. Sie gelten für den ganzen Account und alle Geräte."));
+    nodes.push(...accountGroups.map((group) => settingsCard(group, snapshot.payload || {})));
+  }
+  const profileGroups = data.settingsCatalog.filter((group) => group.scope !== "account");
+  const head = sectionHead("Pro Profil", profiles.length > 1 ? "Profil wählen:" : "");
+  if (profiles.length > 1) {
+    const switcher = rcElement("div", null, "rc-tab-switch");
+    for (const profile of profiles) {
+      const button = rcElement("button", profile.name, "button secondary");
+      button.type = "button";
+      button.setAttribute("aria-pressed", String(profile.id === state.settingsProfileId));
+      button.addEventListener("click", () => {
+        state.settingsProfileId = profile.id;
+        renderAccountSettings();
+      });
+      switcher.append(button);
     }
-    return card;
+    head.append(switcher);
+  }
+  nodes.push(head);
+  if (!state.settingsProfileId) {
+    nodes.push(rcElement("p", "Dieser Account hat kein Profil in der Cloud.", "rc-hint"));
+  } else {
+    const values = snapshot.payload?.profileSettingsById?.[state.settingsProfileId] || {};
+    nodes.push(...profileGroups.map((group) => settingsCard(group, values)));
+  }
+  groupsBox.replaceChildren(...nodes);
+}
+
+function formatClock(seconds) {
+  const total = Math.max(0, Math.round(Number(seconds) || 0));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (value) => String(value).padStart(2, "0");
+  return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+function historyRow({ title, subtitle, posterPath, percent, position, duration, updatedAt, chips = [] }) {
+  const row = rcElement("div", null, "history-row");
+  const poster = document.createElement("img");
+  poster.className = "history-poster";
+  poster.alt = "";
+  poster.loading = "lazy";
+  if (posterPath && /^\/[\w.-]+$/.test(posterPath)) poster.src = `https://image.tmdb.org/t/p/w92${posterPath}`;
+  else poster.classList.add("is-empty");
+  const body = rcElement("div", null, "history-body");
+  const head = rcElement("div", null, "history-head");
+  head.append(rcElement("strong", title || "Unbekannter Titel"));
+  for (const chip of chips) head.append(accountChip(chip));
+  body.append(head);
+  if (subtitle) body.append(rcElement("small", subtitle));
+  const clamped = Math.max(0, Math.min(100, Math.round(percent ?? 0)));
+  const bar = document.createElement("progress");
+  bar.max = 100;
+  bar.value = clamped;
+  bar.setAttribute("aria-label", `${clamped} Prozent gesehen`);
+  const times = [`${clamped} %`];
+  if (position && duration) times.push(`${formatClock(position)} von ${formatClock(duration)}`);
+  else if (duration) times.push(`Dauer ${formatClock(duration)}`);
+  body.append(bar, rcElement("small", `${times.join(" · ")} · zuletzt ${formatDate(updatedAt)}`));
+  row.append(poster, body);
+  return row;
+}
+
+function episodeLabel(season, episode) {
+  if (season === null || season === undefined || episode === null || episode === undefined) return "";
+  return `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+}
+
+async function renderHistoryTab() {
+  const data = state.selectedAccount;
+  if (!data) return;
+  const accountId = data.account.id;
+  const profiles = data.snapshot?.profiles || [];
+  const names = new Map(profiles.map((profile) => [profile.id, profile.name]));
+  const history = state.history;
+  const switcher = byId("history-profiles");
+  switcher.replaceChildren();
+  if (profiles.length > 1) {
+    for (const [id, name] of [["", "Alle Profile"], ...profiles.map((profile) => [profile.id, profile.name])]) {
+      const button = rcElement("button", name, "button secondary");
+      button.type = "button";
+      button.setAttribute("aria-pressed", String(history.profile === id));
+      button.addEventListener("click", () => {
+        history.profile = id;
+        history.offset = 0;
+        renderHistoryTab().catch((error) => showToast(error.message, true));
+      });
+      switcher.append(button);
+    }
+  } else {
+    history.profile = "";
+  }
+  const showProfile = !history.profile && profiles.length > 1;
+
+  // Continue watching lives in the cloud snapshot, per profile.
+  const byProfile = data.snapshot?.payload?.localContinueWatchingByProfile || {};
+  const entries = Object.entries(byProfile)
+    .filter(([id]) => !history.profile || id === history.profile)
+    .flatMap(([id, items]) => (Array.isArray(items) ? items.map((item) => ({ item, id })) : []))
+    .sort((a, b) => Number(b.item.updatedAtMs || 0) - Number(a.item.updatedAtMs || 0));
+  const continueBox = byId("history-continue");
+  continueBox.replaceChildren(
+    ...(entries.length
+      ? entries.slice(0, 40).map(({ item, id }) => historyRow({
+        title: item.title,
+        subtitle: [episodeLabel(item.season, item.episode), item.episodeTitle].filter(Boolean).join(" · "),
+        posterPath: item.posterPath,
+        percent: item.progress,
+        position: item.resumePositionSeconds,
+        duration: item.durationSeconds,
+        updatedAt: item.updatedAtMs,
+        chips: [item.isUpNext ? "Als Nächstes" : null, showProfile ? names.get(id) || id : null].filter(Boolean),
+      }))
+      : [rcElement("p", data.snapshot ? "Nichts zum Weiterschauen in der Cloud." : "Kein Cloud-Snapshot vorhanden.", "rc-hint")]),
+  );
+
+  const query = new URLSearchParams({ limit: String(history.limit), offset: String(history.offset) });
+  if (history.profile) query.set("profile_id", history.profile);
+  const result = await api(`/admin-api/accounts/${encodeURIComponent(accountId)}/watch-history?${query}`);
+  history.total = result.total;
+  byId("history-list").replaceChildren(
+    ...(result.items.length
+      ? result.items.map((item) => historyRow({
+        title: item.title,
+        subtitle: [episodeLabel(item.season, item.episode), item.episode_title].filter(Boolean).join(" · "),
+        posterPath: item.poster_path,
+        percent: (item.progress ?? 0) * 100,
+        position: item.position_seconds,
+        duration: item.duration_seconds,
+        updatedAt: item.updated_at,
+        chips: [item.media_type === "tv" ? "Serie" : "Film", showProfile ? names.get(item.profile_id) || item.profile_id : null].filter(Boolean),
+      }))
+      : [rcElement("p", "Noch kein Wiedergabeverlauf.", "rc-hint")]),
+  );
+  renderPagination("history-pagination", { total: result.total, limit: result.limit, offset: result.offset }, (offset) => {
+    history.offset = offset;
+    renderHistoryTab().catch((error) => showToast(error.message, true));
   });
-  groupsBox.replaceChildren(...cards);
 }
 
 function accountChip(text, className = "") {

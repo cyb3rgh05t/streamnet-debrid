@@ -22,6 +22,11 @@ import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
 import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.ACCENT_COLOR_KEY
 import com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY
+import com.arflix.tv.util.ProfileSettingName
+import com.arflix.tv.util.profileBooleanSettingKey
+import com.arflix.tv.util.profileStringSettingKey
+import com.arflix.tv.util.readProfileBoolean
+import com.arflix.tv.util.readProfileStringOrNull
 import com.arflix.tv.util.ACCENT_GRADIENT_BACKGROUND_KEY
 import com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY
 import com.arflix.tv.util.Constants
@@ -867,7 +872,16 @@ class CloudSyncRepository @Inject constructor(
         val filterSubtitlesByLanguage: Boolean = true,
         val homeServerConnectionJson: String? = null,
         val torrServerBaseUrl: String? = null,
-        val catalogueRowLayoutModes: Map<String, String> = emptyMap()
+        val catalogueRowLayoutModes: Map<String, String> = emptyMap(),
+        // Per-profile since 2.6.023; null = not stored by any device yet (never resets a local choice).
+        val oledBlackBackground: Boolean? = null,
+        val accentGradientBackground: Boolean? = null,
+        val subtitlePreloadEnabled: Boolean? = null,
+        val subtitleRemoveHearingImpaired: Boolean? = null,
+        val subtitleAiEnabled: Boolean? = null,
+        val subtitleAiAutoSelect: Boolean? = null,
+        val subtitleAiFindBestMatch: Boolean? = null,
+        val subtitleAiModel: String? = null
     )
 
     // ── DataStore key helpers ──
@@ -1050,10 +1064,8 @@ class CloudSyncRepository @Inject constructor(
     // existing merges; `defaultSubtitle` keeps its own `subtitleSettingsUpdatedAt` logic.
 
     private val globalMergeKeys = listOf(
-        "accentColor", "oledBlackBackground", "accentGradientBackground", "skipProfileSelection", "customUserAgent",
-        "dnsProvider", "subtitleAiEnabled", "subtitleAiAutoSelect", "subtitleAiFindBestMatch",
-        "subtitlePreloadEnabled", "dolbyVisionCompatEnabled", "subtitleAiApiKey",
-        "subtitleAiModel", "subtitleRemoveHearingImpaired"
+        "accentColor", "skipProfileSelection", "customUserAgent",
+        "dnsProvider", "dolbyVisionCompatEnabled", "subtitleAiApiKey"
     )
     // Per-profile fields excluded from the generic merge (handled by their own logic / not values).
     private val profileMergeExclude = setOf("defaultSubtitle", "subtitleSettingsUpdatedAt")
@@ -1306,7 +1318,15 @@ class CloudSyncRepository @Inject constructor(
                         autoPlayMinQuality = normalizeAutoPlayMinQuality(
                             prefs[autoPlayMinQualityKeyFor(profile.id)] ?: "Any"
                         ),
-                        includeSpecials = prefs[includeSpecialsKeyFor(profile.id)] ?: false
+                        includeSpecials = prefs[includeSpecialsKeyFor(profile.id)] ?: false,
+                        oledBlackBackground = readProfileBoolean(prefs, profile.id, ProfileSettingName.OLED_BLACK_BACKGROUND, OLED_BLACK_BACKGROUND_KEY, false),
+                        accentGradientBackground = readProfileBoolean(prefs, profile.id, ProfileSettingName.ACCENT_GRADIENT_BACKGROUND, ACCENT_GRADIENT_BACKGROUND_KEY, false),
+                        subtitlePreloadEnabled = readProfileBoolean(prefs, profile.id, ProfileSettingName.SUBTITLE_PRELOAD_ENABLED, subtitlePreloadEnabledKey, true),
+                        subtitleRemoveHearingImpaired = readProfileBoolean(prefs, profile.id, ProfileSettingName.SUBTITLE_REMOVE_HEARING_IMPAIRED, subtitleRemoveHearingImpairedKey, true),
+                        subtitleAiEnabled = readProfileBoolean(prefs, profile.id, ProfileSettingName.SUBTITLE_AI_ENABLED, subtitleAiEnabledKey, false),
+                        subtitleAiAutoSelect = readProfileBoolean(prefs, profile.id, ProfileSettingName.SUBTITLE_AI_AUTO_SELECT, subtitleAiAutoSelectKey, false),
+                        subtitleAiFindBestMatch = readProfileBoolean(prefs, profile.id, ProfileSettingName.SUBTITLE_AI_FIND_BEST_MATCH, subtitleAiFindBestMatchKey, false),
+                        subtitleAiModel = readProfileStringOrNull(prefs, profile.id, ProfileSettingName.SUBTITLE_AI_MODEL, subtitleAiModelKey) ?: "GROQ_LLAMA_70B"
                     )
                 )
             }
@@ -1330,8 +1350,10 @@ class CloudSyncRepository @Inject constructor(
         root.put("includeSpecials", prefs[includeSpecialsKey()] ?: false)
         root.put("dnsProvider", globalDnsProvider)
         root.put("customUserAgent", prefs[customUserAgentKey] ?: "")
-        root.put("oledBlackBackground", prefs[OLED_BLACK_BACKGROUND_KEY] ?: false)
-        root.put("accentGradientBackground", prefs[ACCENT_GRADIENT_BACKGROUND_KEY] ?: false)
+        // Top-level copies of the per-profile settings below mirror the active profile, for older apps.
+        val mirrorProfileId = profileRepository.getActiveProfileId()
+        root.put("oledBlackBackground", readProfileBoolean(prefs, mirrorProfileId, ProfileSettingName.OLED_BLACK_BACKGROUND, OLED_BLACK_BACKGROUND_KEY, false))
+        root.put("accentGradientBackground", readProfileBoolean(prefs, mirrorProfileId, ProfileSettingName.ACCENT_GRADIENT_BACKGROUND, ACCENT_GRADIENT_BACKGROUND_KEY, false))
         val accentColor = prefs[ACCENT_COLOR_KEY] ?: "Orange"
         root.put("accentColor", accentColor)
         root.put("focusBorderColor", accentColor)
@@ -1339,15 +1361,15 @@ class CloudSyncRepository @Inject constructor(
         root.put("subtitleSettingsUpdatedAt", prefs[subtitleSettingsUpdatedAtKey()]?.toLongOrNull() ?: 0L)
         root.put("skipProfileSelection", prefs[SKIP_PROFILE_SELECTION_KEY] ?: false)
 
-        // Global AI subtitle settings (non-profile-scoped)
-        root.put("subtitleAiEnabled", prefs[subtitleAiEnabledKey] ?: false)
-        root.put("subtitleAiAutoSelect", prefs[subtitleAiAutoSelectKey] ?: false)
-        root.put("subtitleAiFindBestMatch", prefs[subtitleAiFindBestMatchKey] ?: false)
-        root.put("subtitlePreloadEnabled", prefs[subtitlePreloadEnabledKey] ?: true)
+        root.put("subtitleAiEnabled", readProfileBoolean(prefs, mirrorProfileId, ProfileSettingName.SUBTITLE_AI_ENABLED, subtitleAiEnabledKey, false))
+        root.put("subtitleAiAutoSelect", readProfileBoolean(prefs, mirrorProfileId, ProfileSettingName.SUBTITLE_AI_AUTO_SELECT, subtitleAiAutoSelectKey, false))
+        root.put("subtitleAiFindBestMatch", readProfileBoolean(prefs, mirrorProfileId, ProfileSettingName.SUBTITLE_AI_FIND_BEST_MATCH, subtitleAiFindBestMatchKey, false))
+        root.put("subtitlePreloadEnabled", readProfileBoolean(prefs, mirrorProfileId, ProfileSettingName.SUBTITLE_PRELOAD_ENABLED, subtitlePreloadEnabledKey, true))
+        root.put("subtitleAiModel", readProfileStringOrNull(prefs, mirrorProfileId, ProfileSettingName.SUBTITLE_AI_MODEL, subtitleAiModelKey) ?: "GROQ_LLAMA_70B")
+        root.put("subtitleRemoveHearingImpaired", readProfileBoolean(prefs, mirrorProfileId, ProfileSettingName.SUBTITLE_REMOVE_HEARING_IMPAIRED, subtitleRemoveHearingImpairedKey, true))
+        // Device/account-wide settings
         root.put("dolbyVisionCompatEnabled", prefs[dolbyVisionCompatKey] ?: true)
         root.put("subtitleAiApiKey", prefs[subtitleAiApiKeyKey] ?: "")
-        root.put("subtitleAiModel", prefs[subtitleAiModelKey] ?: "GROQ_LLAMA_70B")
-        root.put("subtitleRemoveHearingImpaired", prefs[subtitleRemoveHearingImpairedKey] ?: true)
 
         root.put("activeProfileId", profileRepository.getActiveProfileId() ?: JSONObject.NULL)
         root.put("profiles", JSONArray(gson.toJson(profiles)))
@@ -2275,6 +2297,14 @@ class CloudSyncRepository @Inject constructor(
                         prefs[autoPlaySingleSourceKeyFor(profileId)] = state.autoPlaySingleSource
                         prefs[autoPlayMinQualityKeyFor(profileId)] = normalizeAutoPlayMinQuality(state.autoPlayMinQuality)
                         prefs[includeSpecialsKeyFor(profileId)] = state.includeSpecials
+                        state.oledBlackBackground?.let { prefs[profileBooleanSettingKey(profileId, ProfileSettingName.OLED_BLACK_BACKGROUND)] = it }
+                        state.accentGradientBackground?.let { prefs[profileBooleanSettingKey(profileId, ProfileSettingName.ACCENT_GRADIENT_BACKGROUND)] = it }
+                        state.subtitlePreloadEnabled?.let { prefs[profileBooleanSettingKey(profileId, ProfileSettingName.SUBTITLE_PRELOAD_ENABLED)] = it }
+                        state.subtitleRemoveHearingImpaired?.let { prefs[profileBooleanSettingKey(profileId, ProfileSettingName.SUBTITLE_REMOVE_HEARING_IMPAIRED)] = it }
+                        state.subtitleAiEnabled?.let { prefs[profileBooleanSettingKey(profileId, ProfileSettingName.SUBTITLE_AI_ENABLED)] = it }
+                        state.subtitleAiAutoSelect?.let { prefs[profileBooleanSettingKey(profileId, ProfileSettingName.SUBTITLE_AI_AUTO_SELECT)] = it }
+                        state.subtitleAiFindBestMatch?.let { prefs[profileBooleanSettingKey(profileId, ProfileSettingName.SUBTITLE_AI_FIND_BEST_MATCH)] = it }
+                        state.subtitleAiModel?.takeIf { it.isNotBlank() }?.let { prefs[profileStringSettingKey(profileId, ProfileSettingName.SUBTITLE_AI_MODEL)] = it }
                     }
                 }
             }
@@ -2334,6 +2364,8 @@ class CloudSyncRepository @Inject constructor(
     private suspend fun applyCloudGlobalSettings(root: JSONObject, activeProfileId: String) {
         var restoredDnsProvider: String? = null
         var restoredCustomUserAgent: String? = null
+        fun activeProfileHasCloudField(field: String): Boolean =
+            root.optJSONObject("profileSettingsById")?.optJSONObject(activeProfileId)?.has(field) == true
         if (
             root.has("dnsProvider") ||
             root.has("customUserAgent") ||
@@ -2358,10 +2390,12 @@ class CloudSyncRepository @Inject constructor(
                     }
                     restoredCustomUserAgent = userAgent
                 }
-                if (root.has("oledBlackBackground")) {
+                // Snapshots from apps older than 2.6.023 only carry these as top-level, device-wide
+                // values; they become the fallback for profiles that have no value of their own.
+                if (root.has("oledBlackBackground") && !activeProfileHasCloudField("oledBlackBackground")) {
                     prefs[OLED_BLACK_BACKGROUND_KEY] = root.optBoolean("oledBlackBackground", false)
                 }
-                if (root.has("accentGradientBackground")) {
+                if (root.has("accentGradientBackground") && !activeProfileHasCloudField("accentGradientBackground")) {
                     prefs[ACCENT_GRADIENT_BACKGROUND_KEY] = root.optBoolean("accentGradientBackground", false)
                 }
                 if ((root.has("accentColor") || root.has("focusBorderColor")) &&
@@ -2386,13 +2420,21 @@ class CloudSyncRepository @Inject constructor(
         val hasAiSettings = root.has("subtitleAiEnabled") || root.has("subtitleAiApiKey")
         if (hasAiSettings) {
             context.settingsDataStore.edit { prefs ->
-                prefs[subtitleAiEnabledKey] = root.optBoolean("subtitleAiEnabled", false)
-                prefs[subtitleAiAutoSelectKey] = root.optBoolean("subtitleAiAutoSelect", false)
-                prefs[subtitleAiFindBestMatchKey] = root.optBoolean("subtitleAiFindBestMatch", false)
+                // Per-profile values arrive with profileSettingsById; the top-level copies are only the
+                // fallback for snapshots written by apps older than 2.6.023.
+                if (!activeProfileHasCloudField("subtitleAiEnabled")) {
+                    prefs[subtitleAiEnabledKey] = root.optBoolean("subtitleAiEnabled", false)
+                }
+                if (!activeProfileHasCloudField("subtitleAiAutoSelect")) {
+                    prefs[subtitleAiAutoSelectKey] = root.optBoolean("subtitleAiAutoSelect", false)
+                }
+                if (!activeProfileHasCloudField("subtitleAiFindBestMatch")) {
+                    prefs[subtitleAiFindBestMatchKey] = root.optBoolean("subtitleAiFindBestMatch", false)
+                }
                 // Only apply when the backup actually carries the field — backups pushed by app
                 // versions that predate the setting must not reset it (realtime sync pulls after
                 // EVERY push from any device, so one old-version device would keep wiping it).
-                if (root.has("subtitlePreloadEnabled")) {
+                if (root.has("subtitlePreloadEnabled") && !activeProfileHasCloudField("subtitlePreloadEnabled")) {
                     prefs[subtitlePreloadEnabledKey] = root.optBoolean("subtitlePreloadEnabled", false)
                 }
                 // has() guard: backups from app versions predating this field must not reset it.
@@ -2402,8 +2444,10 @@ class CloudSyncRepository @Inject constructor(
                 val apiKey = root.optString("subtitleAiApiKey", "")
                 if (apiKey.isNotBlank()) prefs[subtitleAiApiKeyKey] = apiKey
                 val model = root.optString("subtitleAiModel", "GROQ_LLAMA_70B")
-                if (model.isNotBlank()) prefs[subtitleAiModelKey] = model
-                prefs[subtitleRemoveHearingImpairedKey] = root.optBoolean("subtitleRemoveHearingImpaired", true)
+                if (model.isNotBlank() && !activeProfileHasCloudField("subtitleAiModel")) prefs[subtitleAiModelKey] = model
+                if (!activeProfileHasCloudField("subtitleRemoveHearingImpaired")) {
+                    prefs[subtitleRemoveHearingImpairedKey] = root.optBoolean("subtitleRemoveHearingImpaired", true)
+                }
             }
         }
     }

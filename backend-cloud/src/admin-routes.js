@@ -1058,6 +1058,63 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     };
   });
 
+  // Watch history of one account for the admin: only the fields the list shows, newest first.
+  app.get("/admin-api/accounts/:accountId/watch-history", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    await authenticatedAdmin(request, pool, jwtKey);
+    const accountId = validAccountId(request, reply);
+    if (!accountId) return;
+    const limit = Math.min(Math.max(Number.parseInt(request.query?.limit, 10) || 25, 1), 100);
+    const offset = Math.max(Number.parseInt(request.query?.offset, 10) || 0, 0);
+    const profileId = String(request.query?.profile_id || "").trim().slice(0, 200);
+    const values = [accountId];
+    let filter = "";
+    if (profileId) {
+      values.push(profileId);
+      filter = " and profile_id = $2";
+    }
+    const [rows, count] = await Promise.all([
+      pool.query(
+        `select id, profile_id, media_type, show_tmdb_id, season, episode, updated_at, payload
+           from watch_history
+          where account_id = $1${filter}
+          order by updated_at desc, id desc
+          limit ${limit} offset ${offset}`,
+        values,
+      ),
+      pool.query(
+        `select count(*)::int as total from watch_history where account_id = $1${filter}`,
+        values,
+      ),
+    ]);
+    const text = (value) => (typeof value === "string" ? value.slice(0, 300) : null);
+    const number = (value) => (Number.isFinite(Number(value)) && value !== null && value !== "" ? Number(value) : null);
+    return {
+      total: Number(count.rows[0]?.total || 0),
+      limit,
+      offset,
+      items: rows.rows.map((row) => {
+        const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
+        return {
+          id: row.id,
+          profile_id: row.profile_id,
+          media_type: row.media_type,
+          tmdb_id: row.show_tmdb_id,
+          season: row.season,
+          episode: row.episode,
+          title: text(payload.title),
+          episode_title: text(payload.episode_title),
+          progress: number(payload.progress),
+          position_seconds: number(payload.position_seconds),
+          duration_seconds: number(payload.duration_seconds),
+          poster_path: text(payload.poster_path),
+          stream_title: text(payload.stream_title),
+          updated_at: row.updated_at,
+        };
+      }),
+    };
+  });
+
   app.patch(
     "/admin-api/accounts/:accountId/snapshot",
     async (request, reply) => {

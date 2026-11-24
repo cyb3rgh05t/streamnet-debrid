@@ -71,6 +71,25 @@ const mimeTypes = {
 };
 
 // Edits made through the demo UI stay in memory until the server restarts.
+const demoHistory = Array.from({ length: 58 }, (_, index) => {
+  const tv = index % 3 !== 0;
+  return {
+    id: `demo-history-${index}`,
+    profile_id: index % 4 === 0 ? "profile-kids" : "profile-living-room",
+    media_type: tv ? "tv" : "movie",
+    tmdb_id: 1000 + index,
+    season: tv ? 1 + (index % 3) : null,
+    episode: tv ? 1 + (index % 8) : null,
+    title: tv ? `Demo-Serie ${index % 7}` : `Demo-Film ${index % 9}`,
+    episode_title: tv ? `Folge ${1 + (index % 8)}` : null,
+    progress: Math.min(1, (index % 10) / 9),
+    position_seconds: (index % 10) * 280,
+    duration_seconds: 2520,
+    poster_path: null,
+    stream_title: null,
+    updated_at: new Date(Date.now() - index * 5_400_000).toISOString(),
+  };
+});
 const demoSettingEdits = new Map();
 function withDemoEdits(account) {
   return { ...buildDemoPayload(account), ...demoSettingEdits.get(account.id) };
@@ -210,6 +229,16 @@ function buildDemoPayload(account) {
         "Arrival",
       ]),
       "profile-kids": watchlist(["Klaus"]),
+    },
+    localContinueWatchingByProfile: {
+      "profile-living-room": [
+        { id: 1, title: "Demo-Serie 1", season: 2, episode: 4, episodeTitle: "Der Wendepunkt", progress: 63, mediaType: "tv", posterPath: null, updatedAtMs: Date.now() - 3_600_000, resumePositionSeconds: 1590, durationSeconds: 2520 },
+        { id: 2, title: "Demo-Film 3", progress: 21, mediaType: "movie", posterPath: null, updatedAtMs: Date.now() - 86_400_000, resumePositionSeconds: 1800, durationSeconds: 7800 },
+        { id: 3, title: "Demo-Serie 5", season: 1, episode: 1, progress: 0, isUpNext: true, mediaType: "tv", posterPath: null, updatedAtMs: Date.now() - 172_800_000, durationSeconds: 2700 },
+      ],
+      "profile-kids": [
+        { id: 4, title: "Demo-Trickfilm", progress: 80, mediaType: "movie", posterPath: null, updatedAtMs: Date.now() - 7_200_000, resumePositionSeconds: 4300, durationSeconds: 5400 },
+      ],
     },
     profileSettingsById: {
       "profile-living-room": { autoPlayNext: false, subtitleSize: "Large", accentColor: "Blue", smoothScrolling: true, trailerDelaySeconds: 3 },
@@ -443,7 +472,7 @@ const server = createServer(async (request, reply) => {
       try {
         const body = await readBody(request);
         const next = applyAdminSnapshotMutation(withDemoEdits(account), body);
-        demoSettingEdits.set(account.id, { profileSettingsById: next.profileSettingsById, fieldUpdatedAt: next.fieldUpdatedAt });
+        demoSettingEdits.set(account.id, next);
         account.revision += 1;
         return json(reply, 200, { accepted: true, revision: account.revision });
       } catch (error) {
@@ -512,6 +541,13 @@ const server = createServer(async (request, reply) => {
         limit,
         offset,
       });
+    }
+    if (request.method === "GET" && /^\/admin-api\/accounts\/[^/]+\/watch-history$/.test(url.pathname)) {
+      const profile = url.searchParams.get("profile_id");
+      const limit = Number(url.searchParams.get("limit") || 25);
+      const offset = Number(url.searchParams.get("offset") || 0);
+      const all = demoHistory.filter((item) => !profile || item.profile_id === profile);
+      return json(reply, 200, { total: all.length, limit, offset, items: all.slice(offset, offset + limit) });
     }
     if (
       request.method === "GET" &&

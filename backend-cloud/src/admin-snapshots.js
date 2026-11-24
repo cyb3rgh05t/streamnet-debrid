@@ -5,7 +5,7 @@ import {
   syncAdminStreamNetHostOverrides,
   xtreamUrls,
 } from "./streamnet-host-overrides.js";
-import { validateProfileSettingValue } from "./profile-settings-catalog.js";
+import { isAccountSetting, validateProfileSettingValue } from "./profile-settings-catalog.js";
 
 const blockedPropertyNames = new Set(["__proto__", "constructor", "prototype"]);
 const sensitivePropertyPattern =
@@ -625,6 +625,15 @@ export function applyAdminSnapshotMutation(
     if (rootKey === "profileSettingsById") validateProfileSettingValue(field, clonedValue);
     objectAt(payload, rootKey, profileId)[field] = clonedValue;
     stampFieldUpdatedAt(payload, rootKey, profileId, field, now);
+  } else if (operation === "set_account_setting") {
+    // Account-wide settings sit at the top of the snapshot; devices merge them through "g:<field>".
+    const field = cleanIdentifier(request.field, "field");
+    if (!isAccountSetting(field)) throw new Error("Setting is not an account-wide setting");
+    const value = cloneJson(data, "Field data");
+    validateProfileSettingValue(field, value);
+    payload[field] = value;
+    if (!isPlainObject(payload.fieldUpdatedAt)) payload.fieldUpdatedAt = {};
+    payload.fieldUpdatedAt[`g:${field}`] = now;
   } else {
     throw new Error("Unsupported operation");
   }

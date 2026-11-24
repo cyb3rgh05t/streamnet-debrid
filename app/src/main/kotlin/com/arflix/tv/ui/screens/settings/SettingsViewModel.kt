@@ -1,5 +1,10 @@
 package com.arflix.tv.ui.screens.settings
 
+import com.arflix.tv.util.ProfileSettingName
+import com.arflix.tv.util.profileBooleanSettingKey
+import com.arflix.tv.util.profileStringSettingKey
+import com.arflix.tv.util.readProfileBoolean
+import com.arflix.tv.util.readProfileStringOrNull
 import com.arflix.tv.util.deviceDisplayDataStore
 import android.content.Context
 import android.graphics.Bitmap
@@ -406,15 +411,16 @@ class SettingsViewModel @Inject constructor(
     private fun includeSpecialsKey() = profileManager.profileBooleanKey("include_specials")
     private val qualityFiltersKey = stringPreferencesKey("quality_filters")
 
-    // Global (non-profile-scoped) AI subtitle settings â€” device-wide, not per-profile
-    private val subtitleAiEnabledKey = booleanPreferencesKey("subtitle_ai_enabled")
-    private val subtitleAiAutoSelectKey = booleanPreferencesKey("subtitle_ai_auto_select")
-    private val subtitleAiFindBestMatchKey = booleanPreferencesKey("subtitle_ai_find_best_match")
-    private val subtitlePreloadEnabledKey = booleanPreferencesKey("subtitle_preload_enabled")
+    // AI subtitle settings: the *LegacyKey values are the pre-2.6.023 device-wide fallback; the API key stays global
+    private val subtitleAiEnabledLegacyKey = booleanPreferencesKey("subtitle_ai_enabled")
+    private val subtitleAiAutoSelectLegacyKey = booleanPreferencesKey("subtitle_ai_auto_select")
+    private val subtitleAiFindBestMatchLegacyKey = booleanPreferencesKey("subtitle_ai_find_best_match")
+    private val subtitlePreloadEnabledLegacyKey = booleanPreferencesKey("subtitle_preload_enabled")
     private val dolbyVisionCompatKey = booleanPreferencesKey("dolby_vision_compat")
     private val subtitleAiApiKeyKey = stringPreferencesKey("subtitle_ai_api_key")
-    private val subtitleAiModelKey = stringPreferencesKey("subtitle_ai_model")
-    private val subtitleRemoveHearingImpairedKey = booleanPreferencesKey("subtitle_remove_hearing_impaired")
+    private val subtitleAiModelLegacyKey = stringPreferencesKey("subtitle_ai_model")
+    private val subtitleRemoveHearingImpairedLegacyKey = booleanPreferencesKey("subtitle_remove_hearing_impaired")
+    private fun profileFlag(name: String) = profileBooleanSettingKey(profileManager.getProfileIdSync(), name)
     private fun includeSpecialsKeyFor(profileId: String) = profileManager.profileBooleanKeyFor(profileId, "include_specials")
     private val gson = Gson()
     private var lastObservedIptvM3u: String = ""
@@ -669,8 +675,14 @@ class SettingsViewModel @Inject constructor(
             val frameRateMode = normalizeFrameRateMode(prefs[frameRateMatchingModeKey()])
             val deviceModeOverride = prefs[com.arflix.tv.util.DEVICE_MODE_OVERRIDE_KEY] ?: "auto"
             val skipProfileSelection = prefs[com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY] ?: false
-            val oledBlackBackground = prefs[com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY] ?: false
-            val accentGradientBackground = prefs[com.arflix.tv.util.ACCENT_GRADIENT_BACKGROUND_KEY] ?: false
+            val oledBlackBackground = readProfileBoolean(
+                prefs, loadProfileId, ProfileSettingName.OLED_BLACK_BACKGROUND,
+                com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY, false
+            )
+            val accentGradientBackground = readProfileBoolean(
+                prefs, loadProfileId, ProfileSettingName.ACCENT_GRADIENT_BACKGROUND,
+                com.arflix.tv.util.ACCENT_GRADIENT_BACKGROUND_KEY, false
+            )
             val contentLang = com.arflix.tv.util.normalizeAppLanguage(prefs[contentLanguageKey()])
             // Apply content language to MediaRepository immediately
             mediaRepository.contentLanguage = contentLang
@@ -743,16 +755,31 @@ class SettingsViewModel @Inject constructor(
                 }
             }.getOrDefault(emptyList())
 
-            val subtitleAiEnabled = prefs[subtitleAiEnabledKey] ?: false
-            val subtitleAiAutoSelect = prefs[subtitleAiAutoSelectKey] ?: false
-            val subtitleAiFindBestMatch = prefs[subtitleAiFindBestMatchKey] ?: false
-            val subtitlePreloadEnabled = prefs[subtitlePreloadEnabledKey] ?: true
+            val subtitleAiEnabled = readProfileBoolean(
+                prefs, loadProfileId, ProfileSettingName.SUBTITLE_AI_ENABLED, subtitleAiEnabledLegacyKey, false
+            )
+            val subtitleAiAutoSelect = readProfileBoolean(
+                prefs, loadProfileId, ProfileSettingName.SUBTITLE_AI_AUTO_SELECT, subtitleAiAutoSelectLegacyKey, false
+            )
+            val subtitleAiFindBestMatch = readProfileBoolean(
+                prefs, loadProfileId, ProfileSettingName.SUBTITLE_AI_FIND_BEST_MATCH, subtitleAiFindBestMatchLegacyKey, false
+            )
+            val subtitlePreloadEnabled = readProfileBoolean(
+                prefs, loadProfileId, ProfileSettingName.SUBTITLE_PRELOAD_ENABLED, subtitlePreloadEnabledLegacyKey, true
+            )
             val dolbyVisionCompatEnabled = prefs[dolbyVisionCompatKey] ?: true
             val subtitleAiApiKey = prefs[subtitleAiApiKeyKey] ?: ""
             val subtitleAiModel = runCatching {
-                SubtitleAiModel.valueOf(prefs[subtitleAiModelKey] ?: SubtitleAiModel.GROQ_LLAMA_70B.name)
+                SubtitleAiModel.valueOf(
+                    readProfileStringOrNull(
+                        prefs, loadProfileId, ProfileSettingName.SUBTITLE_AI_MODEL, subtitleAiModelLegacyKey
+                    ) ?: SubtitleAiModel.GROQ_LLAMA_70B.name
+                )
             }.getOrDefault(SubtitleAiModel.GROQ_LLAMA_70B)
-            val subtitleRemoveHearingImpaired = prefs[subtitleRemoveHearingImpairedKey] ?: true
+            val subtitleRemoveHearingImpaired = readProfileBoolean(
+                prefs, loadProfileId, ProfileSettingName.SUBTITLE_REMOVE_HEARING_IMPAIRED,
+                subtitleRemoveHearingImpairedLegacyKey, true
+            )
 
             // Check auth statuses
             val authState = authRepository.authState.first()
@@ -1635,7 +1662,7 @@ class SettingsViewModel @Inject constructor(
     fun setOledBlackBackground(enabled: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { prefs ->
-                prefs[com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY] = enabled
+                prefs[profileFlag(ProfileSettingName.OLED_BLACK_BACKGROUND)] = enabled
             }
             _uiState.value = _uiState.value.copy(oledBlackBackground = enabled)
             syncLocalStateToCloud(silent = true)
@@ -1645,7 +1672,7 @@ class SettingsViewModel @Inject constructor(
     fun setAccentGradientBackground(enabled: Boolean) {
         viewModelScope.launch {
             context.settingsDataStore.edit { prefs ->
-                prefs[com.arflix.tv.util.ACCENT_GRADIENT_BACKGROUND_KEY] = enabled
+                prefs[profileFlag(ProfileSettingName.ACCENT_GRADIENT_BACKGROUND)] = enabled
             }
             _uiState.value = _uiState.value.copy(accentGradientBackground = enabled)
             syncLocalStateToCloud(silent = true)
@@ -1884,7 +1911,7 @@ class SettingsViewModel @Inject constructor(
 
     fun setSubtitleAiEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            context.settingsDataStore.edit { it[subtitleAiEnabledKey] = enabled }
+            context.settingsDataStore.edit { it[profileFlag(ProfileSettingName.SUBTITLE_AI_ENABLED)] = enabled }
             _uiState.value = _uiState.value.copy(subtitleAiEnabled = enabled)
             syncLocalStateToCloud(silent = true)
         }
@@ -1892,7 +1919,7 @@ class SettingsViewModel @Inject constructor(
 
     fun setSubtitleAiAutoSelect(enabled: Boolean) {
         viewModelScope.launch {
-            context.settingsDataStore.edit { it[subtitleAiAutoSelectKey] = enabled }
+            context.settingsDataStore.edit { it[profileFlag(ProfileSettingName.SUBTITLE_AI_AUTO_SELECT)] = enabled }
             _uiState.value = _uiState.value.copy(subtitleAiAutoSelect = enabled)
             syncLocalStateToCloud(silent = true)
         }
@@ -1900,7 +1927,7 @@ class SettingsViewModel @Inject constructor(
 
     fun setSubtitleAiFindBestMatch(enabled: Boolean) {
         viewModelScope.launch {
-            context.settingsDataStore.edit { it[subtitleAiFindBestMatchKey] = enabled }
+            context.settingsDataStore.edit { it[profileFlag(ProfileSettingName.SUBTITLE_AI_FIND_BEST_MATCH)] = enabled }
             _uiState.value = _uiState.value.copy(subtitleAiFindBestMatch = enabled)
             syncLocalStateToCloud(silent = true)
         }
@@ -1908,7 +1935,7 @@ class SettingsViewModel @Inject constructor(
 
     fun setSubtitlePreloadEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            context.settingsDataStore.edit { it[subtitlePreloadEnabledKey] = enabled }
+            context.settingsDataStore.edit { it[profileFlag(ProfileSettingName.SUBTITLE_PRELOAD_ENABLED)] = enabled }
             _uiState.value = _uiState.value.copy(subtitlePreloadEnabled = enabled)
             syncLocalStateToCloud(silent = true)
         }
@@ -1924,7 +1951,7 @@ class SettingsViewModel @Inject constructor(
 
     fun setSubtitleRemoveHearingImpaired(enabled: Boolean) {
         viewModelScope.launch {
-            context.settingsDataStore.edit { it[subtitleRemoveHearingImpairedKey] = enabled }
+            context.settingsDataStore.edit { it[profileFlag(ProfileSettingName.SUBTITLE_REMOVE_HEARING_IMPAIRED)] = enabled }
             _uiState.value = _uiState.value.copy(subtitleRemoveHearingImpaired = enabled)
             syncLocalStateToCloud(silent = true)
         }
@@ -1940,7 +1967,7 @@ class SettingsViewModel @Inject constructor(
 
     fun setSubtitleAiModel(model: SubtitleAiModel) {
         viewModelScope.launch {
-            context.settingsDataStore.edit { it[subtitleAiModelKey] = model.name }
+            context.settingsDataStore.edit { it[profileStringSettingKey(profileManager.getProfileIdSync(), ProfileSettingName.SUBTITLE_AI_MODEL)] = model.name }
             _uiState.value = _uiState.value.copy(subtitleAiModel = model)
             syncLocalStateToCloud(silent = true)
         }

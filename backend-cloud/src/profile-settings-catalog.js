@@ -6,7 +6,40 @@ const sizes = ["Small", "Normal", "Large", "Extra Large"];
 
 const choice = (value, label) => ({ value, label });
 
+// Offered in the app's audio language picker; "Auto (Original)" and "None" are special choices.
+const audioLanguages = [
+  "Auto (Original)", "None", "English", "Arabic", "Bengali", "Bulgarian", "Chinese", "Croatian", "Czech", "Danish",
+  "Dutch", "Estonian", "Finnish", "French", "German", "Greek", "Gujarati", "Hebrew", "Hindi", "Hungarian",
+  "Indonesian", "Italian", "Japanese", "Kannada", "Korean", "Lithuanian", "Malayalam", "Marathi", "Norwegian",
+  "Persian", "Polish", "Portuguese", "Portuguese (Brazil)", "Punjabi", "Romanian", "Russian", "Serbian", "Slovak",
+  "Slovenian", "Spanish", "Swedish", "Tamil", "Telugu", "Thai", "Turkish", "Ukrainian", "Vietnamese",
+];
+const audioLanguageLabels = { "Auto (Original)": "Automatisch (Original)", None: "Keine" };
+
+// Regions of the app's streaming-region picker (ISO country codes).
+const streamingRegions = [
+  ["DE", "Deutschland"], ["AT", "Österreich"], ["CH", "Schweiz"], ["US", "USA"], ["GB", "Großbritannien"],
+  ["FR", "Frankreich"], ["NL", "Niederlande"], ["BE", "Belgien"], ["ES", "Spanien"], ["IT", "Italien"],
+  ["PT", "Portugal"], ["PL", "Polen"], ["SE", "Schweden"], ["NO", "Norwegen"], ["DK", "Dänemark"],
+  ["FI", "Finnland"], ["IE", "Irland"], ["CA", "Kanada"], ["AU", "Australien"], ["BR", "Brasilien"],
+  ["MX", "Mexiko"], ["TR", "Türkei"],
+];
+
 export const profileSettingGroups = [
+  {
+    id: "account",
+    title: "Darstellung & Technik",
+    scope: "account",
+    settings: [
+      { field: "skipProfileSelection", type: "boolean", default: false, label: "Profilauswahl überspringen", hint: "Startet direkt im zuletzt genutzten Profil." },
+      { field: "dolbyVisionCompatEnabled", type: "boolean", default: true, label: "Dolby-Vision-Kompatibilität", hint: "Hilft bei Geräten, die Dolby Vision nicht sauber darstellen." },
+      {
+        field: "dnsProvider", type: "select", default: "system", label: "DNS-Anbieter",
+        hint: "Hilft, wenn der Anbieter des Nutzers Adressen blockiert.",
+        options: [choice("system", "System-DNS"), choice("cloudflare", "Cloudflare"), choice("google", "Google"), choice("adguard", "AdGuard")],
+      },
+    ],
+  },
   {
     id: "playback",
     title: "Wiedergabe",
@@ -52,12 +85,29 @@ export const profileSettingGroups = [
       },
       { field: "subtitleStylized", type: "boolean", default: true, label: "Gestaltete Untertitel", hint: "Übernimmt Stil-Angaben aus der Untertiteldatei." },
       { field: "filterSubtitlesByLanguage", type: "boolean", default: true, label: "Nach Sprache filtern" },
+      { field: "subtitlePreloadEnabled", type: "boolean", default: true, label: "Untertitel vorladen" },
+      { field: "subtitleRemoveHearingImpaired", type: "boolean", default: true, label: "Hinweise für Hörgeschädigte entfernen" },
+    ],
+  },
+  {
+    id: "ai-subtitles",
+    title: "KI-Untertitel",
+    settings: [
+      { field: "subtitleAiEnabled", type: "boolean", default: false, label: "KI-Übersetzung aktiv", hint: "Der API-Schlüssel gehört zum Account und wird hier bewusst nicht angezeigt." },
+      { field: "subtitleAiAutoSelect", type: "boolean", default: false, label: "Passenden Untertitel automatisch wählen" },
+      { field: "subtitleAiFindBestMatch", type: "boolean", default: false, label: "Zuerst besten Treffer suchen" },
+      {
+        field: "subtitleAiModel", type: "select", default: "GROQ_LLAMA_70B", label: "Modell",
+        options: [choice("GROQ_LLAMA_70B", "Groq (GPT-OSS 120B)"), choice("GEMINI_FLASH_25", "Gemini Flash")],
+      },
     ],
   },
   {
     id: "home",
     title: "Home & Oberfläche",
     settings: [
+      { field: "oledBlackBackground", type: "boolean", default: false, label: "Reines Schwarz (OLED)" },
+      { field: "accentGradientBackground", type: "boolean", default: false, label: "Akzent-Verlauf im Hintergrund" },
       {
         field: "cardLayoutMode", type: "select", default: "Landscape", label: "Kartenformat",
         options: [choice("Landscape", "Quer"), choice("Poster", "Poster")],
@@ -108,14 +158,41 @@ export const profileSettingGroups = [
       })),
     ],
   },
+  {
+    id: "language",
+    title: "Sprache & Region",
+    settings: [
+      {
+        field: "contentLanguage", type: "select", default: "de-DE", label: "Inhalts- und App-Sprache",
+        hint: "Sprache der Titel und Beschreibungen. Die App übernimmt sie auch für ihre Oberfläche.",
+        options: [choice("de-DE", "Deutsch"), choice("en-US", "Englisch")],
+      },
+      {
+        field: "streamingRegion", type: "select", default: "auto", label: "Streaming-Region",
+        hint: "Land für die Streaming-Dienste. Automatisch folgt der Inhaltssprache.",
+        options: [choice("auto", "Automatisch"), ...streamingRegions.map(([code, name]) => choice(code, name))],
+      },
+      {
+        field: "defaultAudioLanguage", type: "select", default: "Auto (Original)", label: "Standard-Tonspur",
+        options: audioLanguages.map((language) => choice(language, audioLanguageLabels[language] ?? language)),
+      },
+    ],
+  },
 ];
 
 const definitions = new Map(
-  profileSettingGroups.flatMap((group) => group.settings).map((setting) => [setting.field, setting]),
+  profileSettingGroups
+    .flatMap((group) => group.settings.map((setting) => ({ ...setting, scope: group.scope ?? "profile" })))
+    .map((setting) => [setting.field, setting]),
 );
 
 export function profileSettingDefinition(field) {
   return definitions.get(field) ?? null;
+}
+
+/** Account-wide settings live at the top of the snapshot and are stamped under "g:<field>". */
+export function isAccountSetting(field) {
+  return definitions.get(field)?.scope === "account";
 }
 
 /** The value as the app stores it. Known settings only accept their own choices; unknown fields pass through. */

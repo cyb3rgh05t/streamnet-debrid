@@ -6,8 +6,8 @@
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <title>StreamNet Admin</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin/admin.css?v=1.0.061" />
-    <script src="/admin/admin.js?v=1.0.061" defer></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=1.0.062" />
+    <script src="/admin/admin.js?v=1.0.062" defer></script>
   </head>
   <body>
     <div id="page-loading"></div>
@@ -1205,9 +1205,17 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5" /></svg>
               <span><strong>Add-ons</strong><small>Manifeste &amp; Profile</small></span>
             </button>
+            <button type="button" class="global-category" data-acc-tab="history" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+              <span><strong>Verlauf</strong><small>Weiterschauen &amp; gesehen</small></span>
+            </button>
             <button type="button" class="global-category" data-acc-tab="settings" data-needs-snapshot="true" aria-pressed="false">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></svg>
               <span><strong>Einstellungen</strong><small>App-Optionen aus der Ferne</small></span>
+            </button>
+            <button type="button" class="global-category" data-acc-tab="snapshot" data-needs-snapshot="true" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h2M16 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2M9 9h6M9 13h6" /></svg>
+              <span><strong>Snapshot</strong><small>Cloud-Daten ansehen</small></span>
             </button>
             <button type="button" class="global-category" data-acc-tab="audit" aria-pressed="false">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h10" /></svg>
@@ -1215,11 +1223,7 @@
             </button>
             <button type="button" class="global-category" data-acc-tab="danger" aria-pressed="false">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 3 20h18L12 4ZM12 10v4M12 17h.01" /></svg>
-              <span><strong>Aktionen</strong><small>Sitzungen &amp; Konto</small></span>
-            </button>
-            <button type="button" class="global-category" data-acc-tab="snapshot" data-needs-snapshot="true" aria-pressed="false">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h2M16 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2M9 9h6M9 13h6" /></svg>
-              <span><strong>Rohdaten</strong><small>Snapshot ansehen</small></span>
+              <span><strong>Danger Zone</strong><small>Sitzungen &amp; Konto</small></span>
             </button>
           </nav>
 
@@ -1521,6 +1525,22 @@
             </section>
           </div>
 
+          <div class="rc-panel hidden" data-acc-panel="history">
+            <section class="history-panel" aria-labelledby="account-history-title">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">WIEDERGABE</p>
+                  <h2 id="account-history-title">Weiterschauen &amp; Verlauf</h2>
+                </div>
+              </div>
+              <div id="history-profiles" class="rc-tab-switch"></div>
+              <h3 class="rc-heading">Weiterschauen</h3>
+              <div id="history-continue" class="history-list"></div>
+              <h3 class="rc-heading">Verlauf</h3>
+              <div id="history-list" class="history-list"></div>
+              <div id="history-pagination" class="pagination-bar"></div>
+            </section>
+          </div>
           <div class="rc-panel hidden" data-acc-panel="settings">
             <section class="settings-panel" aria-labelledby="account-remote-settings-title">
               <div class="section-heading">
@@ -1539,7 +1559,7 @@
               <div class="section-heading">
                 <div>
                   <p class="eyebrow">REDACTED</p>
-                  <h2 id="payload-title">Rohdaten (Snapshot)</h2>
+                  <h2 id="payload-title">Snapshot</h2>
                 </div>
                 <div class="payload-actions">
                   <button id="copy-payload" class="text-button" type="button">
@@ -1644,7 +1664,7 @@
           <section class="danger-zone" aria-labelledby="account-danger-title">
             <div>
               <p class="eyebrow">DANGER ZONE</p>
-              <h2 id="account-danger-title">Account-Aktionen</h2>
+              <h2 id="account-danger-title">Danger Zone</h2>
             </div>
             <p class="muted">
               Diese Aktionen wirken direkt auf Sitzungen, Gerätehistorie oder

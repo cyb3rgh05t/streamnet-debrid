@@ -597,6 +597,11 @@ function androidProfileSettings(settings: AppSettings) {
     autoPlayMinQuality: androidQuality(settings.autoPlayMinQuality),
     includeSpecials: settings.includeSpecials,
     qualityFilters: settings.qualityFilters,
+    // Per profile since Android 2.6.023 (they used to be device-wide root fields).
+    oledBlackBackground: settings.oledBlack,
+    subtitleRemoveHearingImpaired: settings.removeHearingImpaired,
+    subtitleAiEnabled: settings.aiSubtitlesEnabled,
+    subtitleAiAutoSelect: settings.aiAutoSelect,
   };
 }
 
@@ -661,11 +666,17 @@ export function settingsFromAndroidProfile(
     partial.aiAutoSelect = Boolean(state.subtitleAiAutoSelect);
   if ("subtitleAiApiKey" in state)
     partial.aiApiKey = String(state.subtitleAiApiKey || "");
+  // The web's model is a small enum while Android stores a full model id — only adopt a value that
+  // is already in the web's vocabulary.
   if ("subtitleAiModel" in state) {
     const model = String(state.subtitleAiModel || "").toLowerCase();
-    partial.aiSubtitleModel =
-      model === "gemini" ? "gemini" : model === "off" ? "off" : "groq";
+    if (model === "off" || model === "groq" || model === "gemini")
+      partial.aiSubtitleModel = model;
   }
+  if ("oledBlackBackground" in state)
+    partial.oledBlack = Boolean(state.oledBlackBackground);
+  if ("subtitleRemoveHearingImpaired" in state)
+    partial.removeHearingImpaired = Boolean(state.subtitleRemoveHearingImpaired);
   if ("subtitleStylized" in state)
     partial.subtitleStylized = Boolean(state.subtitleStylized);
   if ("secondarySubtitle" in state)
@@ -1174,26 +1185,31 @@ export async function pullCloudPayload(
   const globalSettings: Partial<AppSettings> = {};
   if ("accentColor" in root && !("accentColor" in profileSettings))
     globalSettings.accentColor = normalizeAccentName(root.accentColor);
-  if ("oledBlackBackground" in root)
+  // oledBlack, the AI toggles and hearing-impaired filtering are per-profile now; the root copies
+  // (written by older apps / mirroring Android's active profile) are only a fallback.
+  if ("oledBlackBackground" in root && !("oledBlack" in profileSettings))
     globalSettings.oledBlack = Boolean(root.oledBlackBackground);
   if ("customUserAgent" in root)
     globalSettings.customUserAgent = String(root.customUserAgent ?? "");
   if ("skipProfileSelection" in root)
     globalSettings.skipProfileSelection = Boolean(root.skipProfileSelection);
-  if ("subtitleAiEnabled" in root)
+  if ("subtitleAiEnabled" in root && !("aiSubtitlesEnabled" in profileSettings))
     globalSettings.aiSubtitlesEnabled = Boolean(root.subtitleAiEnabled);
-  if ("subtitleAiAutoSelect" in root)
+  if ("subtitleAiAutoSelect" in root && !("aiAutoSelect" in profileSettings))
     globalSettings.aiAutoSelect = Boolean(root.subtitleAiAutoSelect);
   if ("subtitleAiApiKey" in root)
     globalSettings.aiApiKey = String(root.subtitleAiApiKey ?? "");
   // The web's model is a small enum ("off"/"groq"/"gemini") while Android stores a full model id —
   // only adopt the value when it's already in the web's vocabulary (i.e. the web wrote it last).
-  if ("subtitleAiModel" in root) {
+  if ("subtitleAiModel" in root && !("aiSubtitleModel" in profileSettings)) {
     const model = String(root.subtitleAiModel ?? "");
     if (model === "off" || model === "groq" || model === "gemini")
       globalSettings.aiSubtitleModel = model;
   }
-  if ("subtitleRemoveHearingImpaired" in root)
+  if (
+    "subtitleRemoveHearingImpaired" in root &&
+    !("removeHearingImpaired" in profileSettings)
+  )
     globalSettings.removeHearingImpaired = Boolean(
       root.subtitleRemoveHearingImpaired,
     );
@@ -1421,7 +1437,6 @@ export async function saveCloudSettings(
         normalizeAccentName(settings.accentColor),
         baseline?.accentColor,
       ],
-      ["oledBlackBackground", settings.oledBlack, baseline?.oledBlack],
       [
         "skipProfileSelection",
         settings.skipProfileSelection,
@@ -1429,19 +1444,7 @@ export async function saveCloudSettings(
       ],
       ["customUserAgent", settings.customUserAgent, baseline?.customUserAgent],
       ["dnsProvider", settings.dnsProvider, baseline?.dnsProvider],
-      [
-        "subtitleAiEnabled",
-        settings.aiSubtitlesEnabled,
-        baseline?.aiSubtitlesEnabled,
-      ],
-      ["subtitleAiAutoSelect", settings.aiAutoSelect, baseline?.aiAutoSelect],
       ["subtitleAiApiKey", settings.aiApiKey, baseline?.aiApiKey],
-      ["subtitleAiModel", settings.aiSubtitleModel, baseline?.aiSubtitleModel],
-      [
-        "subtitleRemoveHearingImpaired",
-        settings.removeHearingImpaired,
-        baseline?.removeHearingImpaired,
-      ],
     ];
     for (const [rootKey, newVal, baseVal] of globalFields) {
       if (!baseline || !sameFieldValue(newVal, baseVal)) {

@@ -2956,3 +2956,82 @@ tbody tr[data-account-id]:focus .account-primary {
   padding: 0 9px;
   font-size: 11px;
 }
+
+.settings-section-head {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+.settings-section-head h3 {
+  margin: 0;
+}
+.settings-section-head .rc-hint {
+  margin: 0;
+}
+
+/* Account history tab: continue watching and watch history */
+.history-panel .rc-heading {
+  margin: 22px 0 10px;
+}
+.history-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 10px;
+}
+.history-list > .rc-hint {
+  grid-column: 1 / -1;
+}
+.history-row {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.02);
+}
+.history-poster {
+  flex: none;
+  width: 46px;
+  height: 69px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface-raised);
+}
+.history-poster.is-empty {
+  visibility: hidden;
+}
+.history-body {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.history-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.history-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.history-body small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.history-body progress {
+  width: 100%;
+  height: 5px;
+  accent-color: var(--accent);
+}
+@media (max-width: 560px) {
+  .history-list {
+    grid-template-columns: 1fr;
+  }
+}

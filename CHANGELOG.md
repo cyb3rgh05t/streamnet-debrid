@@ -4,6 +4,30 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.062] - 2026-11-24
+
+- Adminpanel, Einzel-Account: Neuer Tab „Verlauf“ (zwischen Add-ons und Einstellungen) mit „Weiterschauen“ und dem Wiedergabeverlauf des Accounts. Pro Karte: Poster, Titel, Staffel/Folge, Fortschrittsbalken in Prozent, Position von Dauer, Zeitpunkt der letzten Wiedergabe; beim Verlauf zusätzlich Serie/Film. Bei mehreren Profilen lässt sich nach Profil filtern („Alle Profile“ zeigt den Profilnamen an der Karte). „Weiterschauen“ stammt aus dem Cloud-Snapshot (höchstens die 40 neuesten), der Verlauf kommt aus der Datenbank, neueste zuerst, 25 pro Seite mit Seitenwechsel. Der Tab funktioniert auch ohne Snapshot (dann ohne „Weiterschauen“).
+
+- Backend: Neue Route `GET /admin-api/accounts/:accountId/watch-history` (Admin-Token nötig; `limit` bis 100, `offset`, optional `profile_id`) liefert nur Anzeigefelder (Titel, Staffel/Folge, Fortschritt, Position, Dauer, Poster, Zeitpunkt), keine Stream-Schlüssel und keine Rohdaten. Neue Tests. Im Demo-Server geprüft (Profilfilter, Seitenwechsel). Nicht geprüft: gegen die echte Datenbank.
+
+- Adminpanel, Einzel-Account: Die Tabs stehen jetzt in der Reihenfolge Übersicht, Geräte, Playlists, Add-ons, Verlauf, Einstellungen, Snapshot, Protokoll, Danger Zone. „Rohdaten“ heißt wieder „Snapshot“, „Aktionen“ heißt „Danger Zone“ (auch die Überschrift im Tab).
+
+- Adminpanel, Einstellungen: Mehr Einstellungen aus der Ferne. Neu für den ganzen Account (gelten für alle Profile und Geräte): Profilauswahl überspringen, Dolby-Vision-Kompatibilität und DNS-Anbieter (System, Cloudflare, Google, AdGuard). Neu pro Profil: reines Schwarz (OLED), Akzent-Verlauf im Hintergrund, Untertitel vorladen, Hinweise für Hörgeschädigte entfernen, KI-Untertitel (aktiv, automatisch wählen, besten Treffer suchen, Modell), Inhalts- und App-Sprache (Deutsch/Englisch), Streaming-Region (Automatisch oder eines der 22 Länder der App) und Standard-Tonspur (die Sprachliste der App). Die Seite ist in „Für den ganzen Account“ und „Pro Profil“ (mit Profilauswahl) gegliedert. Bewusst nicht enthalten: Zugangsdaten und Schlüssel (z. B. der KI-Untertitel-Schlüssel), Server-Adressen, Standard-Untertitelsprache (eigene Abgleichlogik der App) und der Benutzer-Agent.
+
+- Backend: Neue Operation `set_account_setting` schreibt account-weite Einstellungen oben im Snapshot und setzt den Zeitstempel `g:<Feld>`, über den die Geräte sie übernehmen; Werte werden gegen den Katalog geprüft (Protokoll: „Account-Einstellung geändert“). Neue Tests. Im Demo-Server geprüft. Nicht geprüft: Übernahme auf einem echten Gerät.
+
+- Adminpanel, Einstellungen: OLED, Akzent-Verlauf, Untertitel vorladen, Hinweise für Hörgeschädigte und die neue Gruppe „KI-Untertitel“ stehen jetzt unter „Pro Profil“; „Für den ganzen Account“ enthält nur noch Profilauswahl überspringen, Dolby-Vision-Kompatibilität und DNS-Anbieter. Geräte mit einer App vor dieser Version kennen die Profilwerte noch nicht und ignorieren sie.
+
+- Backend: `backend-cloud/.env.example` mit Platzhalter-Domains (`mydomain.com`) aktualisiert.
+
+## [Web 1.0.088] - 2026-11-24
+
+- Web: OLED-Hintergrund, Hinweise für Hörgeschädigte und die KI-Untertitel-Schalter (aktiv, automatisch wählen) werden pro Profil gelesen und geschrieben (wie Android); der Wert oben im Snapshot gilt nur noch als Ersatz für Profile ohne eigenen Wert. Das Web schreibt das KI-Modell nicht mehr in den Snapshot, weil dessen Auswahl („Aus/Groq/Gemini“) nicht zu den Modellnamen der App passt. Neuer Test; Web-Tests 137 von 137, `tsc` ohne Fehler.
+
+## [2.6.023] - 2026-11-24
+
+- Android: Diese Einstellungen gelten jetzt pro Profil statt pro Gerät: reines Schwarz (OLED), Akzent-Verlauf im Hintergrund, Untertitel vorladen, Hinweise für Hörgeschädigte entfernen und die KI-Untertitel-Optionen (aktiv, automatisch wählen, besten Treffer suchen, Modell). Ein Profil kann also OLED an haben, ein anderes im selben Account aus. Bisherige Werte bleiben erhalten: Solange ein Profil keinen eigenen Wert gespeichert hat, gilt der bisherige geräteweite Wert; erst eine Änderung speichert ihn für dieses Profil. Der Cloud-Abgleich überträgt die Werte pro Profil (`profileSettingsById`) mit Zeitstempel pro Feld; die Felder oben im Snapshot spiegeln das aktive Profil nur noch für ältere App-Versionen und werden von der neuen App nur als Ersatz gelesen, wenn das Profil in der Cloud noch keinen eigenen Wert hat. Bewusst weiter account- bzw. geräteweit: Profilauswahl überspringen, DNS-Anbieter, Benutzer-Agent, Dolby-Vision-Kompatibilität und der KI-API-Schlüssel. Add-ons (Installation pro Account, Ein/Aus pro Profil) und Plugins (gemeinsam) sind unverändert. Neue Unit-Tests (Profil-Wert vor Altwert, Profile bleiben getrennt); 954 Android-Tests grün. Nicht geprüft: auf einem echten Gerät oder Emulator, Zusammenspiel mit einer älteren App-Version im selben Account.
+
 ## [Backend 1.0.061] - 2026-11-24
 
 - Adminpanel, Einzel-Account: Fix für 1.0.060. Der Tab „Einstellungen“ blieb leer, weil die Server-Antwort für einen Account die Einstellungsliste nicht enthielt (nur der Demo-Server lieferte sie). Die Antwort enthält sie jetzt; ein neuer Test prüft das an der echten Route (ohne den Fix rot). Fehlt die Liste trotzdem, zeigt die Oberfläche einen Hinweis statt einer leeren Seite.

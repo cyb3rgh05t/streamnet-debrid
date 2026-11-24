@@ -38,6 +38,9 @@ import com.arflix.tv.data.repository.LauncherContinueWatchingRepository
 import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.data.repository.WatchHistoryEntry
 import com.arflix.tv.data.repository.WatchHistoryRepository
+import com.arflix.tv.util.ProfileSettingName
+import com.arflix.tv.util.readProfileBoolean
+import com.arflix.tv.util.readProfileStringOrNull
 import com.arflix.tv.util.AnimeMapper
 import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.Constants
@@ -395,7 +398,7 @@ class PlayerViewModel @Inject constructor(
     private var aiModel = SubtitleAiModel.GROQ_LLAMA_70B
     private var aiRemoveHearingImpaired = true
 
-    // Global AI subtitle DataStore keys (device-wide, not profile-scoped)
+    // Legacy device-wide keys: still honoured for profiles that have not saved their own value yet
     private val aiEnabledKey = booleanPreferencesKey("subtitle_ai_enabled")
     private val aiAutoSelectKey = booleanPreferencesKey("subtitle_ai_auto_select")
     private val aiFindBestMatchKey = booleanPreferencesKey("subtitle_ai_find_best_match")
@@ -700,15 +703,21 @@ class PlayerViewModel @Inject constructor(
             setTargetSubtitleLang(normalizeLanguage(preferredSub))
 
             // Load AI subtitle settings
-            aiSubtitleEnabled = prefs[aiEnabledKey] ?: false
-            aiSubtitleAutoSelect = prefs[aiAutoSelectKey] ?: false
-            aiFindBestMatchFirst = prefs[aiFindBestMatchKey] ?: false
-            subtitlePreloadEnabled = prefs[subtitlePreloadKey] ?: true
+            val activeProfileId = profileManager.getProfileIdSync()
+            aiSubtitleEnabled = readProfileBoolean(prefs, activeProfileId, ProfileSettingName.SUBTITLE_AI_ENABLED, aiEnabledKey, false)
+            aiSubtitleAutoSelect = readProfileBoolean(prefs, activeProfileId, ProfileSettingName.SUBTITLE_AI_AUTO_SELECT, aiAutoSelectKey, false)
+            aiFindBestMatchFirst = readProfileBoolean(prefs, activeProfileId, ProfileSettingName.SUBTITLE_AI_FIND_BEST_MATCH, aiFindBestMatchKey, false)
+            subtitlePreloadEnabled = readProfileBoolean(prefs, activeProfileId, ProfileSettingName.SUBTITLE_PRELOAD_ENABLED, subtitlePreloadKey, true)
             aiApiKey = prefs[aiApiKeyKey] ?: ""
             aiModel = runCatching {
-                SubtitleAiModel.valueOf(prefs[aiModelKey] ?: SubtitleAiModel.GROQ_LLAMA_70B.name)
+                SubtitleAiModel.valueOf(
+                    readProfileStringOrNull(prefs, activeProfileId, ProfileSettingName.SUBTITLE_AI_MODEL, aiModelKey)
+                        ?: SubtitleAiModel.GROQ_LLAMA_70B.name
+                )
             }.getOrDefault(SubtitleAiModel.GROQ_LLAMA_70B)
-            aiRemoveHearingImpaired = prefs[aiRemoveHearingImpairedKey] ?: true
+            aiRemoveHearingImpaired = readProfileBoolean(
+                prefs, activeProfileId, ProfileSettingName.SUBTITLE_REMOVE_HEARING_IMPAIRED, aiRemoveHearingImpairedKey, true
+            )
             translationManager.updateService(apiKey = aiApiKey, model = aiModel)
             translationManager.removeHearingImpaired = aiRemoveHearingImpaired
             translationManager.isEnabled = false
