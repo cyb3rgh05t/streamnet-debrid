@@ -2,7 +2,7 @@
 
 Cloudflare Worker for StreamNet Web Live TV. It exposes only `/health` and the allowlisted `/media` relay, rewrites nested HLS URLs back through HTTPS, and accepts requests only from configured StreamNet Web origins.
 
-The web image receives this worker through `NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL`. Do not set `NEXT_PUBLIC_ARVIO_RESOLVER_URL` to this worker; that variable expects the full resolver API, including `/sources`, `/subtitle`, and `/launch`.
+The web image receives this worker through `STREAMNET_MEDIA_RESOLVER_URL`. Do not set `ARVIO_RESOLVER_URL` to this worker; that variable expects the full resolver API, including `/sources`, `/subtitle`, and `/launch`.
 
 Required GitHub Actions secrets:
 

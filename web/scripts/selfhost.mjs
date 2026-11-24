@@ -29,16 +29,16 @@ if (command === "setup") {
   }
   const env = { ...parseEnv(file), ...process.env };
   const errors = [];
-  if (env.NEXT_PUBLIC_SELF_HOSTED !== "true")
+  if (env.SELF_HOSTED !== "true")
     errors.push(
-      "Set NEXT_PUBLIC_SELF_HOSTED=true for an independent installation.",
+      "Set SELF_HOSTED=true for an independent installation.",
     );
   if (!/^[a-f0-9]{32}$/i.test(env.TMDB_API_KEY ?? ""))
     errors.push(
       "Add your TMDB API v3 key (32 hexadecimal characters), not the API read-access bearer token.",
     );
-  const traktId = env.NEXT_PUBLIC_TRAKT_CLIENT_ID || env.TRAKT_CLIENT_ID;
-  const simklId = env.NEXT_PUBLIC_SIMKL_CLIENT_ID || env.SIMKL_CLIENT_ID;
+  const traktId = env.TRAKT_CLIENT_ID;
+  const simklId = env.SIMKL_CLIENT_ID;
   if (traktId && !env.TRAKT_CLIENT_SECRET)
     errors.push(
       "TRAKT_CLIENT_SECRET is required for your Trakt OAuth token exchange/refresh.",
@@ -51,7 +51,7 @@ if (command === "setup") {
     if (env[name])
       errors.push(`Remove ${name}: secrets must stay server-side.`);
   }
-  if (env.NEXT_PUBLIC_ARVIO_RESOLVER_URL)
+  if (env.ARVIO_RESOLVER_URL)
     console.log(
       "Custom resolver configured: check that it is yours and supports the required API.",
     );
@@ -67,7 +67,7 @@ if (command === "setup") {
     process.exitCode = 1;
   } else {
     console.log(
-      "Configuration looks ready. This validates settings, not whether providers accept your keys. Rebuild after changing public credentials or mode.",
+      "Configuration looks ready. This validates settings, not whether providers accept your keys. Restart the server after changing these settings.",
     );
   }
 } else {

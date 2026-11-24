@@ -1,7 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { UpdateWatcher } from "@/components/shell/UpdateWatcher";
+import { readPublicConfig, serializePublicConfig } from "@/lib/publicConfig";
 import "./globals.css";
 import "./tv-guide.css";
+
+// The browser settings come from the server environment on every request, so a .env change needs no rebuild.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "StreamNet Web",
@@ -51,6 +55,11 @@ export default function RootLayout({
   return (
     <html lang="de">
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__STREAMNET_CONFIG__=${serializePublicConfig(readPublicConfig(process.env))};`,
+          }}
+        />
         {/* iOS reads these raw links most reliably when adding to the home
             screen. `precomposed` is the legacy fallback older iOS honors; both
             carry the version bust. */}

@@ -1,4 +1,5 @@
 export const STREAMNET_RELAY_HOSTS: ReadonlySet<string> = new Set([
+  "xyzxyz.streamnet.live",
   "xui.streamnet.live",
   "85.209.176.85",
   "193.200.221.81",

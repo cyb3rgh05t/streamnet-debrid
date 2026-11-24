@@ -21,7 +21,7 @@ concurrency:
 env:
   IMAGE_NAME: ghcr.io/cyb3rgh05t/streamnet-web
   STREAMNET_BACKEND_URL: ${{ vars['STREAMNET_BACKEND_URL'] || 'https://auth.mystreamnet.club' }}
-  STREAMNET_TV_XTREAM_URL: ${{ vars['STREAMNET_TV_XTREAM_URL'] || 'https://xui.streamnet.live' }}
+  STREAMNET_TV_XTREAM_URL: ${{ vars['STREAMNET_TV_XTREAM_URL'] || 'https://xyzxyz.streamnet.live' }}
   STREAMNET_RESOLVER_URL: ${{ vars['STREAMNET_RESOLVER_URL'] || 'https://resolve.streamnet.live' }}
   TRAKT_CLIENT_ID: ${{ vars['TRAKT_CLIENT_ID'] || secrets['TRAKT_CLIENT_ID'] || '' }}
   WEB_BUILD_STAMP: ${{ github.run_started_at }}
@@ -154,13 +154,10 @@ jobs:
       - name: Build Next app
         working-directory: web
         env:
-          NEXT_PUBLIC_SELF_HOSTED: "true"
+          SELF_HOSTED: "true"
           STREAMNET_BACKEND_URL: ${{ env.STREAMNET_BACKEND_URL }}
-          NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL: ${{ env.STREAMNET_TV_XTREAM_URL }}
-          NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL: ${{ env.STREAMNET_RESOLVER_URL }}
-          NEXT_PUBLIC_TRAKT_CLIENT_ID: ${{ env.TRAKT_CLIENT_ID }}
-          NEXT_PUBLIC_BUILD_STAMP: ${{ env.WEB_BUILD_STAMP }}
-          NEXT_PUBLIC_APK_VERSION: ${{ steps.apk_version.outputs.value }}
+          BUILD_STAMP: ${{ env.WEB_BUILD_STAMP }}
+          APK_VERSION: ${{ steps.apk_version.outputs.value }}
         run: npm run build
 
   publish:
@@ -206,14 +203,13 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           build-args: |
-            NEXT_PUBLIC_SELF_HOSTED=true
             NEXT_TELEMETRY_DISABLED=1
             STREAMNET_BACKEND_URL=${{ env.STREAMNET_BACKEND_URL }}
-            NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL=${{ env.STREAMNET_TV_XTREAM_URL }}
-            NEXT_PUBLIC_TRAKT_CLIENT_ID=${{ env.TRAKT_CLIENT_ID }}
-            NEXT_PUBLIC_BUILD_STAMP=${{ env.WEB_BUILD_STAMP }}
-            NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL=${{ env.STREAMNET_RESOLVER_URL }}
-            NEXT_PUBLIC_APK_VERSION=${{ steps.apk_version.outputs.value }}
+            STREAMNET_TV_XTREAM_URL=${{ env.STREAMNET_TV_XTREAM_URL }}
+            TRAKT_CLIENT_ID=${{ env.TRAKT_CLIENT_ID }}
+            BUILD_STAMP=${{ env.WEB_BUILD_STAMP }}
+            STREAMNET_MEDIA_RESOLVER_URL=${{ env.STREAMNET_RESOLVER_URL }}
+            APK_VERSION=${{ steps.apk_version.outputs.value }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

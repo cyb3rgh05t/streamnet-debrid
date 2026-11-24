@@ -1685,16 +1685,16 @@ function AccountsSection() {
               [
                 "APK-App-Version",
                 "APK app version",
-                process.env.NEXT_PUBLIC_APK_VERSION ||
+                process.env.APK_VERSION ||
                   localize(settings.uiLanguage, "unbekannt", "unknown"),
               ],
               ["Web-Version", "Web version", webPackage.version],
               [
                 "Web-Build",
                 "Web build",
-                process.env.NEXT_PUBLIC_BUILD_STAMP
+                process.env.BUILD_STAMP
                   ? formatTime24Hour(
-                      Number(process.env.NEXT_PUBLIC_BUILD_STAMP),
+                      Number(process.env.BUILD_STAMP),
                       settings.uiLanguage === "de" ? "de-DE" : "en-GB",
                       { day: "2-digit", month: "short" },
                     )

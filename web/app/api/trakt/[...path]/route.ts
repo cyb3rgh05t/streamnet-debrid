@@ -5,10 +5,7 @@ async function handler(
   context: { params: Promise<{ path: string[] }> },
 ) {
   const { path } = await context.params;
-  const traktClientId =
-    process.env.TRAKT_CLIENT_ID ||
-    process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID ||
-    "";
+  const traktClientId = process.env.TRAKT_CLIENT_ID || "";
   const traktSecret = process.env.TRAKT_CLIENT_SECRET ?? "";
   const input = new URL(request.url);
   const method = request.method;

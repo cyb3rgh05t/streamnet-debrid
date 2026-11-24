@@ -79,6 +79,17 @@ jobs:
       - name: Prepare placeholder build configuration
         run: cp secrets.defaults.properties secrets.properties
 
+      # Plugin resolution occasionally fails on the runner network; retry it separately so a real
+      # compile or test failure is not repeated.
+      - name: Resolve Gradle plugins
+        run: |
+          for attempt in 1 2 3; do
+            ./gradlew help --no-daemon -q && exit 0
+            echo "Gradle plugin resolution failed (attempt $attempt); retrying in 20 s"
+            sleep 20
+          done
+          exit 1
+
       - name: Compile and test
         run: ./gradlew test :app:compileSideloadDebugKotlin --no-daemon --stacktrace
 
@@ -217,6 +228,15 @@ jobs:
             "keyAlias=$KEY_ALIAS" \
             "keyPassword=$KEY_PASSWORD" \
             > keystore.properties
+
+      - name: Resolve Gradle plugins
+        run: |
+          for attempt in 1 2 3; do
+            ./gradlew help --no-daemon -q && exit 0
+            echo "Gradle plugin resolution failed (attempt $attempt); retrying in 20 s"
+            sleep 20
+          done
+          exit 1
 
       - name: Build release APK
         run: ./gradlew :app:clean :app:assembleSideloadRelease --no-daemon --stacktrace

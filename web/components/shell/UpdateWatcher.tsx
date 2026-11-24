@@ -12,7 +12,7 @@ const RELOAD_GUARD_MS = 4 * 60 * 1000;
 
 export function UpdateWatcher() {
   useEffect(() => {
-    const baked = process.env.NEXT_PUBLIC_BUILD_STAMP;
+    const baked = process.env.BUILD_STAMP;
     if (!baked) return undefined;
     let disposed = false;
 

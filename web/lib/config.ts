@@ -1,3 +1,5 @@
+import { readPublicConfig, type PublicConfig } from "./publicConfig";
+
 function envValue(value: string | undefined, fallback = "") {
   return value && !value.startsWith("$") && !value.includes("****")
     ? value
@@ -9,26 +11,23 @@ const streamnetBackendUrl = envValue(
   "https://auth.mystreamnet.club",
 ).replace(/\/+$/, "");
 
+// The server reads its environment; the browser gets the same values from the page (app/layout.tsx).
+const runtime: PublicConfig =
+  typeof window === "undefined"
+    ? readPublicConfig(process.env)
+    : { ...readPublicConfig({}), ...window.__STREAMNET_CONFIG__ };
+
 export const config = {
   selfHosted: true,
-  sportsMetadataUrl: process.env.NEXT_PUBLIC_SPORTS_METADATA_URL ?? "",
+  sportsMetadataUrl: runtime.sportsMetadataUrl,
   backendUrl: streamnetBackendUrl,
-  streamnetTvXtreamUrl: envValue(
-    process.env.NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL,
-    "https://xui.streamnet.live",
-  ).replace(/\/+$/, ""),
-  mediaResolverUrl: envValue(
-    process.env.NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL,
-    "https://resolve.streamnet.live",
-  ).replace(/\/+$/, ""),
-  resolverUrl: envValue(process.env.NEXT_PUBLIC_ARVIO_RESOLVER_URL, ""),
-  traktClientId: process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID ?? "",
+  streamnetTvXtreamUrl: runtime.streamnetTvXtreamUrl,
+  mediaResolverUrl: runtime.mediaResolverUrl,
+  resolverUrl: runtime.resolverUrl,
+  traktClientId: runtime.traktClientId,
   // OAuth secrets belong only on the server, never in the browser bundle.
   traktClientSecret: "",
-  simklClientId:
-    process.env.NEXT_PUBLIC_SIMKL_CLIENT_ID ||
-    process.env.SIMKL_CLIENT_ID ||
-    "",
+  simklClientId: runtime.simklClientId,
   imageBase: "https://image.tmdb.org/t/p/w780",
   backdropBase: "https://image.tmdb.org/t/p/w1280",
   backdropOriginal: "https://image.tmdb.org/t/p/original",

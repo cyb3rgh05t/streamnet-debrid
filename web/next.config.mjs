@@ -3,6 +3,11 @@ const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   output: "standalone",
+  // Build facts shown in the app and used by the update check; the value is fixed when the image is built.
+  env: {
+    BUILD_STAMP: process.env.BUILD_STAMP ?? "",
+    APK_VERSION: process.env.APK_VERSION ?? "",
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "image.tmdb.org" },

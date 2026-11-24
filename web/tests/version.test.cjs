@@ -24,7 +24,7 @@ test("public version endpoint reports the deployed package with no caching or se
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.deepEqual(await response.json(), {
     version: webPackage.version,
-    build: process.env.NEXT_PUBLIC_BUILD_STAMP || null,
+    build: process.env.BUILD_STAMP || null,
   });
   assert.equal(route.exports.dynamic, "force-dynamic");
 });

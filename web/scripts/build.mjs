@@ -11,9 +11,8 @@ const appGradleUrl = new URL("../../app/build.gradle.kts", import.meta.url);
 const apkVersion = existsSync(appGradleUrl)
   ? readFileSync(appGradleUrl, "utf8").match(/versionName\s*=\s*"([^"]+)"/)?.[1]
   : undefined;
-env.NEXT_PUBLIC_WEB_VERSION = env.NEXT_PUBLIC_WEB_VERSION || webPackage.version;
-env.NEXT_PUBLIC_APK_VERSION = env.NEXT_PUBLIC_APK_VERSION || apkVersion || "";
-if (!env.NEXT_PUBLIC_BUILD_STAMP) {
+env.APK_VERSION = env.APK_VERSION || apkVersion || "";
+if (!env.BUILD_STAMP) {
   const versionFile = new URL("../public/version.json", import.meta.url);
   const rawBuildStamp = existsSync(versionFile)
     ? String(JSON.parse(readFileSync(versionFile, "utf8")).v ?? "")
@@ -30,20 +29,7 @@ if (!env.NEXT_PUBLIC_BUILD_STAMP) {
     );
   }
   writeFileSync(versionFile, `${JSON.stringify({ v: buildStamp })}\n`);
-  env.NEXT_PUBLIC_BUILD_STAMP = buildStamp;
-}
-// Netlify CLI can replace browser variables with masked secret values. Carry
-// the CI-supplied public key under a separate name until the actual Next build.
-if (env.ARVIO_BUILD_APP_ANON_KEY)
-  env.NEXT_PUBLIC_ARVIO_APP_ANON_KEY = env.ARVIO_BUILD_APP_ANON_KEY;
-delete env.ARVIO_BUILD_APP_ANON_KEY;
-if (env.ARVIO_VERIFY_BUILD_CONFIG === "true") {
-  const key = env.NEXT_PUBLIC_ARVIO_APP_ANON_KEY ?? "";
-  if (key.length < 40 || key.includes("*") || key.startsWith("$")) {
-    throw new Error(
-      "Missing or masked public Cloud client key; refusing production build.",
-    );
-  }
+  env.BUILD_STAMP = buildStamp;
 }
 const result = spawnSync(
   process.execPath,

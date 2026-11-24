@@ -130,9 +130,11 @@ The backend URL in `.env` must point to the backend server, normally `https://au
 movie- and series-genre tiles use the same VODWisharr fanart and duotone mapping
 as Android; otherwise the synchronized/static catalog covers remain in use.
 
-`NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL` configures the host for the predefined
+`STREAMNET_TV_XTREAM_URL` configures the host for the predefined
 STREAMNET TV Xtream login in TV settings. It defaults to
-`https://xui.streamnet.live` and is embedded when the web image is built.
+`https://xyzxyz.streamnet.live`. The server reads it on every request (like
+`STREAMNET_MEDIA_RESOLVER_URL`, `TRAKT_CLIENT_ID` and `SIMKL_CLIENT_ID`) and
+hands it to the browser, so a change in `.env` needs a restart, not a rebuild.
 
 For images published by GitHub Actions, the public repository variables
 `STREAMNET_BACKEND_URL` and `STREAMNET_TV_XTREAM_URL` override these defaults.
@@ -213,7 +215,7 @@ uses the same built-in provider/redirect hosts as the app relay unless explicitl
 overridden by `STREAMNET_AUDIO_TRANSCODE_HOSTS`.
 
 The built-in host list in `lib/iptvPlayback.ts` and the configured
-`NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL` host restrict the app relay. The existing
+`STREAMNET_TV_XTREAM_URL` host restrict the app relay. The existing
 proxy fetcher validates public addresses and every redirect hop. Unknown segment
 hosts are rejected, not automatically trusted. Other IPTV providers retain their
 previous direct/worker playback order. Legacy `rewrite=worker` and `rewrite=direct`
