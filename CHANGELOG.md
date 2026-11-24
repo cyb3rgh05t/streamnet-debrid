@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.063] - 2026-11-24
+
+- Adminpanel, Einstellungen: Die Karten einer Zeile sind jetzt gleich hoch (vorher passte sich jede Karte ihrem Inhalt an). Die Einträge stehen weiter oben in der Karte. Im Demo-Server geprüft.
+
+- Adminpanel: „Standard“ als Zustandsanzeige heißt jetzt „Default“ und steht in einem Badge (Akzentfarbe, abgerundet). Betrifft die App-Einstellungen eines Accounts (der Hinweis steht jetzt neben dem Namen und bricht nicht mehr unter den Text um), die Franchise-/Collection-Liste in der Remote Config und die Statuszeile unter den MDBList-Listen („Default · 100 Filme …“). Beschriftungen wie „Standard der App“ und „Auf Standard zurücksetzen“ bleiben unverändert. Im Demo-Server geprüft.
+
 ## [Backend 1.0.062] - 2026-11-24
 
 - Adminpanel, Einzel-Account: Neuer Tab „Verlauf“ (zwischen Add-ons und Einstellungen) mit „Weiterschauen“ und dem Wiedergabeverlauf des Accounts. Pro Karte: Poster, Titel, Staffel/Folge, Fortschrittsbalken in Prozent, Position von Dauer, Zeitpunkt der letzten Wiedergabe; beim Verlauf zusätzlich Serie/Film. Bei mehreren Profilen lässt sich nach Profil filtern („Alle Profile“ zeigt den Profilnamen an der Karte). „Weiterschauen“ stammt aus dem Cloud-Snapshot (höchstens die 40 neuesten), der Verlauf kommt aus der Datenbank, neueste zuerst, 25 pro Seite mit Seitenwechsel. Der Tab funktioniert auch ohne Snapshot (dann ohne „Weiterschauen“).

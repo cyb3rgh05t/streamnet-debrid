@@ -1534,7 +1534,7 @@ function settingsCard(group, values) {
     const row = rcElement("div", null, `setting-row${stored ? "" : " is-default"}`);
     const text = rcElement("div", null, "setting-text");
     const label = rcElement("strong", definition.label);
-    label.append(rcElement("span", "Standard", "setting-default-tag"));
+    label.append(rcElement("span", "Default", "default-badge setting-default-tag"));
     text.append(label);
     if (definition.hint) text.append(rcElement("small", definition.hint));
     let control;
@@ -2587,8 +2587,10 @@ function renderRcFranchiseList() {
     button.type = "button";
     button.className = "rc-franchise-item";
     button.setAttribute("aria-pressed", String(rc.current === item.key));
-    const note = item.standard ? (rcIsChanged(item) ? "geändert" : "Standard") : "Eigene";
-    button.append(rcElement("strong", item.title), rcElement("small", note));
+    const note = rcElement("small");
+    if (item.standard && !rcIsChanged(item)) note.append(rcElement("span", "Default", "default-badge"));
+    else note.textContent = item.standard ? "geändert" : "Eigene";
+    button.append(rcElement("strong", item.title), note);
     button.addEventListener("click", () => {
       stashRcDraft();
       rc.current = item.key;
@@ -3179,7 +3181,8 @@ function refreshRcRowInfo() {
     const info = rcListInfoText(slug ? rc.listInfo[slug] : { title: null, movies: null, shows: null, total: null });
     if (slug && !(slug in rc.listInfo)) missing.push(slug);
     const node = document.querySelector(`[data-rc-info="${input.dataset.rcRow}"]`);
-    node.textContent = `${changed ? "Geändert" : "Standard"} · ${slug ? info : "keine gültige MDBList-Liste"}`;
+    const state = changed ? document.createTextNode("Geändert") : rcElement("span", "Default", "default-badge");
+    node.replaceChildren(state, ` · ${slug ? info : "keine gültige MDBList-Liste"}`);
     node.classList.toggle("is-changed", changed);
     input.closest(".rc-list-input").querySelector(".rc-reset").classList.toggle("hidden", !changed);
   });
