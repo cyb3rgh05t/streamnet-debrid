@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.066] - 2026-11-24
+
+- Adminpanel, Verlauf: „Weiterschauen“ zeigt jetzt wie der Verlauf ein Badge „Film“ oder „Serie“. In beiden Karten sind diese Badges in der Akzentfarbe.
+
+- Adminpanel, Accounts: Wer in der Account-Suche einen Treffer anklickt, hat danach keinen Suchtext mehr im Feld. Vorher blieb er stehen und ließ bei anderen Filtern (z. B. „Geräte online“ vom Dashboard) keine Treffer übrig. Der Online-Filter leert die Suche ebenfalls. Im Demo-Server geprüft.
+
 ## [Backend 1.0.065] - 2026-11-24
 
 - Adminpanel, Danger Zone (Erweitert): Die beiden Geräte-Aktionen sind verständlicher. „Offline-Verlauf zurücksetzen“ heißt jetzt „Offline-Geräte entfernen“ (es ging nie um den Wiedergabeverlauf, sondern um Geräte, die seit mehr als 90 Sekunden nicht online waren). „Geräte & Sessions bereinigen“ heißt „Ereignisse & Logins bereinigen“. Jede Aktion hat eine eigene Überschrift mit Erklärung, was gelöscht wird und was bleibt, einen Hinweis auf das Risiko bei zwei Geräten mit gleicher Browser-Kennung und IP und ausführlichere Bestätigungsdialoge. Das Verhalten der Aktionen ist unverändert. Im Demo-Server geprüft.

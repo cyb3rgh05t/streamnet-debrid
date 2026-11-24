@@ -750,7 +750,7 @@ function renderMetrics(metrics) {
       item.title = "Nur Accounts mit aktuell online gesehenen Geräten anzeigen";
       item.addEventListener("click", () => {
         state.onlineOnly = true;
-        state.accounts.offset = 0;
+        clearAccountSearch();
         selectView("accounts");
       });
     } else if (action === "sessions-info") {
@@ -985,6 +985,12 @@ async function loadAccounts() {
   });
 }
 
+function clearAccountSearch() {
+  window.clearTimeout(state.searchTimer);
+  byId("account-search").value = "";
+  state.accounts.offset = 0;
+}
+
 function renderAccounts(accounts) {
   const body = byId("accounts-body");
   body.replaceChildren();
@@ -1008,11 +1014,16 @@ function renderAccounts(accounts) {
       textCell(account.revision),
       textCell(formatDate(account.snapshot_updated_at)),
     );
-    row.addEventListener("click", () => openAccount(account.id));
+    // The search only served to find this account; leaving it filled would hide results of other filters later.
+    const open = () => {
+      clearAccountSearch();
+      openAccount(account.id);
+    };
+    row.addEventListener("click", open);
     row.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        openAccount(account.id);
+        open();
       }
     });
     body.append(row);
@@ -1696,7 +1707,7 @@ function historyRow({ title, subtitle, posterPath, percent, position, duration, 
   const body = rcElement("div", null, "history-body");
   const head = rcElement("div", null, "history-head");
   head.append(rcElement("strong", title || "Unbekannter Titel"));
-  for (const chip of chips) head.append(accountChip(chip));
+  for (const chip of chips) head.append(accountChip(chip, chip === "Film" || chip === "Serie" ? "is-accent" : ""));
   body.append(head);
   if (subtitle) body.append(rcElement("small", subtitle));
   const clamped = Math.max(0, Math.min(100, Math.round(percent ?? 0)));
@@ -1773,7 +1784,11 @@ async function renderHistoryTab() {
         position: item.resumePositionSeconds,
         duration: item.durationSeconds,
         updatedAt: item.updatedAtMs,
-        chips: [item.isUpNext ? "Als Nächstes" : null, showProfile || !names.has(id) ? profileChip(id) : null].filter(Boolean),
+        chips: [
+          String(item.mediaType).toUpperCase() === "TV" ? "Serie" : "Film",
+          item.isUpNext ? "Als Nächstes" : null,
+          showProfile || !names.has(id) ? profileChip(id) : null,
+        ].filter(Boolean),
       }))
       : [rcElement("p", data.snapshot ? "Nichts zum Weiterschauen in der Cloud." : "Kein Cloud-Snapshot vorhanden.", "rc-hint")]),
   );
