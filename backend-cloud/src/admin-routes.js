@@ -88,6 +88,7 @@ const mutationFailureReasons = new Map([
   ["Payload data is too large", "payload_data_too_large"],
   ["Payload must include at least one profile", "invalid_payload_profiles"],
   ["Cannot delete the only profile", "cannot_delete_last_profile"],
+  ["No orphaned profile data", "no_orphan_profile_data"],
   ["Unsupported operation", "unsupported_operation"],
 ]);
 

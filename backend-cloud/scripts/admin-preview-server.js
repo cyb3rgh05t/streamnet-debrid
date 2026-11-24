@@ -235,9 +235,14 @@ function buildDemoPayload(account) {
         { id: 1, title: "Demo-Serie 1", season: 2, episode: 4, episodeTitle: "Der Wendepunkt", progress: 63, mediaType: "tv", posterPath: "https://image.tmdb.org/t/p/w780/demo-serie.jpg", updatedAtMs: Date.now() - 3_600_000, resumePositionSeconds: 1590, durationSeconds: 2520 },
         { id: 2, title: "Demo-Film 3", progress: 21, mediaType: "movie", posterPath: "/demo-film.jpg", updatedAtMs: Date.now() - 86_400_000, resumePositionSeconds: 1800, durationSeconds: 7800 },
         { id: 3, title: "Demo-Serie 5", season: 1, episode: 1, progress: 0, isUpNext: true, mediaType: "tv", posterPath: null, updatedAtMs: Date.now() - 172_800_000, durationSeconds: 2700 },
+        ...Array.from({ length: 12 }, (_, i) => ({ id: 100 + i, title: `Demo-Film ${10 + i}`, progress: 10 + i * 5, mediaType: "movie", posterPath: null, updatedAtMs: Date.now() - (3 + i) * 86_400_000, resumePositionSeconds: 600, durationSeconds: 6000 })),
       ],
       "profile-kids": [
         { id: 4, title: "Demo-Trickfilm", progress: 80, mediaType: "movie", posterPath: null, updatedAtMs: Date.now() - 7_200_000, resumePositionSeconds: 4300, durationSeconds: 5400 },
+      ],
+      // Left over from a deleted profile: the panel has to flag it and offer the cleanup.
+      "profile-deleted": [
+        { id: 5, title: "Demo-Rest", progress: 0, mediaType: "tv", season: 22, episode: 1116, posterPath: null, updatedAtMs: Date.now() - 300_000, durationSeconds: 1500 },
       ],
     },
     profileSettingsById: {

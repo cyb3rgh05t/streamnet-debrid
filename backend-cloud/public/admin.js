@@ -7,7 +7,7 @@ const state = {
   onlineOnly: false,
   audits: { limit: 10, offset: 0, total: 0 },
   accountAudits: { limit: 10, offset: 0, total: 0 },
-  history: { profile: "", limit: 25, offset: 0, total: 0 },
+  history: { profile: "", limit: 12, offset: 0, continueOffset: 0, total: 0 },
   global: null,
 };
 
@@ -512,6 +512,7 @@ function formatAuditOperation(operation) {
     upsert_playlist: "Playlist hinzugefügt / aktualisiert",
     delete_playlist: "Playlist entfernt",
     delete_profile: "Profil entfernt",
+    cleanup_orphan_profiles: "Verwaiste Profildaten entfernt",
     set_profile_field: "Profileinstellung geändert",
     edit_payload: "Cloud-Daten bearbeitet",
     change_streamnet_host: "StreamNet-TV-Server geändert",
@@ -1290,10 +1291,50 @@ async function openAccount(accountId) {
   document.querySelectorAll("[data-needs-snapshot]").forEach((button) => button.classList.toggle("hidden", !snapshot));
   if (snapshot) updateOperationFields();
   // A refresh after an action keeps the tab; opening another account starts on the overview.
+  renderOrphanProfiles(snapshot?.orphanProfiles || []);
   selectAccountTab(sameAccount && (snapshot || !accountTabNeedsSnapshot(state.accountTab)) ? state.accountTab : "overview");
   state.accountAudits.offset = 0;
-  if (!sameAccount) state.history = { profile: "", limit: 25, offset: 0, total: 0 };
+  if (!sameAccount) state.history = { profile: "", limit: 12, offset: 0, continueOffset: 0, total: 0 };
   await loadAccountAudits(data.account.id);
+}
+
+function renderOrphanProfiles(orphans) {
+  byId("orphan-profiles").classList.toggle("hidden", !orphans.length);
+  if (!orphans.length) return;
+  const total = orphans.reduce((sum, orphan) => sum + orphan.items, 0);
+  byId("orphan-profiles-text").textContent =
+    `Im Cloud-Snapshot liegen noch Daten von ${orphans.length} gelöschten ${orphans.length === 1 ? "Profil" : "Profilen"} ` +
+    `(${total} ${total === 1 ? "Datenbereich" : "Datenbereiche"}, z. B. Weiterschauen, Einstellungen, Zeitstempel). Entfernen macht den Snapshot kleiner ` +
+    `und blendet diese Einträge aus der Verlaufsansicht aus. Bestehende Profile bleiben unverändert.`;
+}
+
+async function cleanupOrphanProfiles() {
+  const confirmed = await confirmAction({
+    title: "Verwaiste Profildaten entfernen",
+    message: "Die Daten gelöschter Profile werden aus dem Snapshot entfernt. Bestehende Profile bleiben unverändert.",
+    confirmLabel: "Daten entfernen",
+    danger: true,
+  });
+  if (!confirmed) return;
+  const accountId = state.selectedAccount.account.id;
+  try {
+    await api(`/admin-api/accounts/${encodeURIComponent(accountId)}/snapshot`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        operation: "cleanup_orphan_profiles",
+        data: {},
+        expectedRevision: state.selectedAccount.snapshot.revision,
+      }),
+    });
+    showToast("Verwaiste Profildaten entfernt.");
+    await openAccount(accountId);
+  } catch (error) {
+    showToast(
+      error.status === 409 ? "Der Snapshot wurde inzwischen geändert. Bitte erneut versuchen." : error.message,
+      true,
+    );
+    if (error.status === 409) await openAccount(accountId);
+  }
 }
 
 async function deleteProfile(profileId, profileName) {
@@ -1683,6 +1724,7 @@ async function renderHistoryTab() {
   const profiles = data.snapshot?.profiles || [];
   const names = new Map(profiles.map((profile) => [profile.id, profile.name]));
   const history = state.history;
+  const reload = () => renderHistoryTab().catch((error) => showToast(error.message, true));
   const switcher = byId("history-profiles");
   switcher.replaceChildren();
   if (profiles.length > 1) {
@@ -1693,7 +1735,8 @@ async function renderHistoryTab() {
       button.addEventListener("click", () => {
         history.profile = id;
         history.offset = 0;
-        renderHistoryTab().catch((error) => showToast(error.message, true));
+        history.continueOffset = 0;
+        reload();
       });
       switcher.append(button);
     }
@@ -1701,17 +1744,28 @@ async function renderHistoryTab() {
     history.profile = "";
   }
   const showProfile = !history.profile && profiles.length > 1;
+  // Data of a deleted profile has no name any more; say so instead of showing a raw id.
+  const profileChip = (id) => (names.has(id) ? names.get(id) : "Gelöschtes Profil");
 
-  // Continue watching lives in the cloud snapshot, per profile.
+  // Weiterschauen: the cloud snapshot, per profile, paged in the browser.
   const byProfile = data.snapshot?.payload?.localContinueWatchingByProfile || {};
   const entries = Object.entries(byProfile)
     .filter(([id]) => !history.profile || id === history.profile)
     .flatMap(([id, items]) => (Array.isArray(items) ? items.map((item) => ({ item, id })) : []))
     .sort((a, b) => Number(b.item.updatedAtMs || 0) - Number(a.item.updatedAtMs || 0));
-  const continueBox = byId("history-continue");
-  continueBox.replaceChildren(
-    ...(entries.length
-      ? entries.slice(0, 40).map(({ item, id }) => historyRow({
+  const pageSize = history.limit;
+  if (history.continueOffset >= entries.length) history.continueOffset = 0;
+  const pageEntries = entries.slice(history.continueOffset, history.continueOffset + pageSize);
+  byId("history-continue-count").textContent = `${entries.length} ${entries.length === 1 ? "Eintrag" : "Einträge"}`;
+  const orphanEntries = entries.filter(({ id }) => !names.has(id)).length;
+  const note = byId("history-continue-note");
+  note.classList.toggle("hidden", !orphanEntries);
+  note.textContent = orphanEntries
+    ? `${orphanEntries} ${orphanEntries === 1 ? "Eintrag stammt" : "Einträge stammen"} von gelöschten Profilen. Unter „Danger Zone“ lassen sich solche Reste entfernen.`
+    : "";
+  byId("history-continue").replaceChildren(
+    ...(pageEntries.length
+      ? pageEntries.map(({ item, id }) => historyRow({
         title: item.title,
         subtitle: [episodeLabel(item.season, item.episode), item.episodeTitle].filter(Boolean).join(" · "),
         posterPath: item.posterPath,
@@ -1719,15 +1773,21 @@ async function renderHistoryTab() {
         position: item.resumePositionSeconds,
         duration: item.durationSeconds,
         updatedAt: item.updatedAtMs,
-        chips: [item.isUpNext ? "Als Nächstes" : null, showProfile ? names.get(id) || id : null].filter(Boolean),
+        chips: [item.isUpNext ? "Als Nächstes" : null, showProfile || !names.has(id) ? profileChip(id) : null].filter(Boolean),
       }))
       : [rcElement("p", data.snapshot ? "Nichts zum Weiterschauen in der Cloud." : "Kein Cloud-Snapshot vorhanden.", "rc-hint")]),
   );
+  renderPagination("history-continue-pagination", { total: entries.length, limit: pageSize, offset: history.continueOffset }, (offset) => {
+    history.continueOffset = offset;
+    reload();
+  });
 
+  // Verlauf: the database, paged by the server.
   const query = new URLSearchParams({ limit: String(history.limit), offset: String(history.offset) });
   if (history.profile) query.set("profile_id", history.profile);
   const result = await api(`/admin-api/accounts/${encodeURIComponent(accountId)}/watch-history?${query}`);
   history.total = result.total;
+  byId("history-count").textContent = `${result.total} ${result.total === 1 ? "Eintrag" : "Einträge"}`;
   byId("history-list").replaceChildren(
     ...(result.items.length
       ? result.items.map((item) => historyRow({
@@ -1738,13 +1798,16 @@ async function renderHistoryTab() {
         position: item.position_seconds,
         duration: item.duration_seconds,
         updatedAt: item.updated_at,
-        chips: [item.media_type === "tv" ? "Serie" : "Film", showProfile ? names.get(item.profile_id) || item.profile_id : null].filter(Boolean),
+        chips: [
+          item.media_type === "tv" ? "Serie" : "Film",
+          showProfile || (profiles.length && !names.has(item.profile_id)) ? profileChip(item.profile_id) : null,
+        ].filter(Boolean),
       }))
       : [rcElement("p", "Noch kein Wiedergabeverlauf.", "rc-hint")]),
   );
   renderPagination("history-pagination", { total: result.total, limit: result.limit, offset: result.offset }, (offset) => {
     history.offset = offset;
-    renderHistoryTab().catch((error) => showToast(error.message, true));
+    reload();
   });
 }
 
@@ -3751,6 +3814,7 @@ byId("clear-online-filter").addEventListener("click", () => {
   loadAccounts().catch((error) => showToast(error.message, true));
 });
 byId("back-button").addEventListener("click", () => selectView("accounts"));
+byId("cleanup-orphan-profiles-button").addEventListener("click", cleanupOrphanProfiles);
 byId("mutation-operation").addEventListener("change", updateOperationFields);
 document.querySelectorAll("[data-acc-tab]").forEach((button) => {
   button.addEventListener("click", () => selectAccountTab(button.dataset.accTab));
@@ -3791,13 +3855,13 @@ byId("reset-offline-devices-button").addEventListener(
   async (event) => {
     const button = event.currentTarget;
     const confirmed = await confirmDeletion({
-      title: "Offline-Verlauf löschen",
+      title: "Offline-Geräte entfernen",
       message:
-        "Alle nicht aktuell online gesehenen Geräte werden aus der Gerätehistorie entfernt. Gerade aktive Geräte bleiben erhalten.",
-      confirmLabel: "Offline-Verlauf endgültig löschen",
+        "Alle Geräte, die gerade nicht online sind, werden samt ihrer Ereignisse aus der Geräteliste gelöscht. Geräte, die jetzt online sind, bleiben. Profile, Verlauf und Logins sind nicht betroffen. Meldet sich ein Gerät später wieder, erscheint es neu.",
+      confirmLabel: "Offline-Geräte entfernen",
     });
     if (!confirmed) return;
-    setButtonBusy(button, true, "Wird zurückgesetzt…");
+    setButtonBusy(button, true, "Wird entfernt…");
     try {
       const result = await api(
         `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/devices/offline`,
@@ -3817,9 +3881,9 @@ byId("cleanup-devices-sessions-button").addEventListener(
   async (event) => {
     const button = event.currentTarget;
     const confirmed = await confirmAction({
-      title: "Geräte & Sessions bereinigen",
+      title: "Ereignisse & Logins bereinigen",
       message:
-        "Pro Gerät bleibt nur der neueste Geräte-Event erhalten. Bei gültigen Logins bleibt pro erkennbarem Client die neueste Session aktiv.",
+        "Pro Gerät bleibt nur der neueste Ereigniseintrag, ältere werden gelöscht (auch bei Online-Geräten). Doppelte gültige Logins mit gleichem Client, gleicher Browser-Kennung und gleicher IP werden abgemeldet; es bleibt der neueste. Zwei verschiedene Geräte mit gleicher Kennung und IP zählen als ein Client, das ältere müsste sich neu anmelden.",
       confirmLabel: "Bereinigen",
       danger: true,
     });
@@ -3963,6 +4027,8 @@ byId("clear-audits-button").addEventListener("click", async (event) => {
 });
 byId("account-search").addEventListener("input", () => {
   window.clearTimeout(state.searchTimer);
+  // A search looks through all accounts, so a "devices online" filter from the dashboard must not hide hits.
+  state.onlineOnly = false;
   state.accounts.offset = 0;
   state.searchTimer = window.setTimeout(
     () => loadAccounts().catch((error) => showToast(error.message, true)),

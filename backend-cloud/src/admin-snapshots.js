@@ -475,16 +475,71 @@ function isSameAddon(addon, id) {
   return canonicalAddonId(addon?.id) === canonicalAddonId(id);
 }
 
+// Everything the cloud snapshot keeps per profile id. Mirrors profileScopedObjectKeys in the Android
+// app's CloudSyncRepository (plus the avatar images, which are keyed the same way).
 const profileScopedRoots = [
   "profileSettingsById",
-  "iptvByProfile",
-  "catalogsByProfile",
-  "hiddenCustomByProfile",
+  "traktTokens",
+  "mdbListSyncByProfile",
+  "dismissedContinueWatchingByProfile",
+  "localContinueWatchingByProfile",
+  "localWatchedMoviesByProfile",
+  "localWatchedEpisodesByProfile",
+  "localWatchedMovieChangesByProfile",
+  "localWatchedEpisodeChangesByProfile",
   "addonsByProfile",
-  "watchlistByProfile",
-  "watchlistRemovedByProfile",
+  "catalogsByProfile",
+  "hiddenPreinstalledByProfile",
+  "hiddenAddonByProfile",
+  "hiddenHomeServerByProfile",
+  "hiddenCustomByProfile",
   "catalogsUpdatedAtByProfile",
+  "iptvByProfile",
+  "watchlistByProfile",
+  "watchlistUpdatedAtByProfile",
+  "watchlistRemovedByProfile",
+  "streamNetHostOverridesByProfile",
+  "profileAvatarImagesById",
 ];
+
+// "p:<profileId>:<field>" and "i:<profileId>:<field>" timestamps belong to a profile as well.
+function fieldStampProfileId(key) {
+  const match = /^[pi]:(.+):[^:]+$/.exec(key);
+  return match ? match[1] : null;
+}
+
+// Profile ids that still have data in the snapshot although the profile itself is gone.
+// Without any profile the list itself is suspect, so nothing counts as orphaned then.
+export function orphanProfileData(payload) {
+  const known = profileIds(payload);
+  if (!known.size) return [];
+  const counts = new Map();
+  const count = (id) => counts.set(id, (counts.get(id) || 0) + 1);
+  for (const rootKey of profileScopedRoots) {
+    if (!isPlainObject(payload[rootKey])) continue;
+    for (const id of Object.keys(payload[rootKey])) if (!known.has(id)) count(id);
+  }
+  if (isPlainObject(payload.fieldUpdatedAt)) {
+    for (const key of Object.keys(payload.fieldUpdatedAt)) {
+      const id = fieldStampProfileId(key);
+      if (id && !known.has(id)) count(id);
+    }
+  }
+  return [...counts].map(([id, items]) => ({ id, items }));
+}
+
+function removeProfileData(payload, ids) {
+  const remove = new Set(ids);
+  for (const rootKey of profileScopedRoots) {
+    if (!isPlainObject(payload[rootKey])) continue;
+    for (const id of remove) delete payload[rootKey][id];
+  }
+  if (isPlainObject(payload.fieldUpdatedAt)) {
+    for (const key of Object.keys(payload.fieldUpdatedAt)) {
+      if (remove.has(fieldStampProfileId(key))) delete payload.fieldUpdatedAt[key];
+    }
+  }
+}
 
 const redactedSentinel = "[REDACTED]";
 
@@ -610,9 +665,19 @@ export function applyAdminSnapshotMutation(
     payload.profiles = profiles.filter(
       (profile) => String(profile?.id || "") !== profileId,
     );
-    for (const rootKey of profileScopedRoots) {
-      if (isPlainObject(payload[rootKey])) delete payload[rootKey][profileId];
+    removeProfileData(payload, [profileId]);
+    // The same deletion marker the app writes: without it a device that still has the profile would bring it back.
+    payload.profileDeletedAtById = {
+      ...(isPlainObject(payload.profileDeletedAtById) ? payload.profileDeletedAtById : {}),
+      [profileId]: now,
+    };
+    if (payload.activeProfileId === profileId) {
+      payload.activeProfileId = String(payload.profiles[0]?.id || "") || null;
     }
+  } else if (operation === "cleanup_orphan_profiles") {
+    const orphans = orphanProfileData(payload);
+    if (!orphans.length) throw new Error("No orphaned profile data");
+    removeProfileData(payload, orphans.map((orphan) => orphan.id));
   } else if (operation === "set_profile_field") {
     const profileId = requireProfile(payload, request.profileId);
     const rootKey = cleanIdentifier(request.rootKey, "rootKey");
@@ -1219,6 +1284,7 @@ export function summarizeAdminPayload(payloadValue) {
   return {
     profiles,
     profileCount: profiles.length,
+    orphanProfiles: orphanProfileData(payload),
     addons: [...addonsById.values()].sort((a, b) =>
       a.name.localeCompare(b.name),
     ),

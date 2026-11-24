@@ -4,6 +4,22 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.065] - 2026-11-24
+
+- Adminpanel, Danger Zone (Erweitert): Die beiden Geräte-Aktionen sind verständlicher. „Offline-Verlauf zurücksetzen“ heißt jetzt „Offline-Geräte entfernen“ (es ging nie um den Wiedergabeverlauf, sondern um Geräte, die seit mehr als 90 Sekunden nicht online waren). „Geräte & Sessions bereinigen“ heißt „Ereignisse & Logins bereinigen“. Jede Aktion hat eine eigene Überschrift mit Erklärung, was gelöscht wird und was bleibt, einen Hinweis auf das Risiko bei zwei Geräten mit gleicher Browser-Kennung und IP und ausführlichere Bestätigungsdialoge. Das Verhalten der Aktionen ist unverändert. Im Demo-Server geprüft.
+
+- Adminpanel, Accounts: Der Filter „Geräte online“ (vom Dashboard) wird zurückgesetzt, sobald man in der Account-Suche tippt. Vorher blieb er aktiv und versteckte Treffer, die nicht online waren; der Hinweis „Nur online …“ ließ sich nur über „Filter entfernen“ löschen. Im Demo-Server geprüft.
+
+- Adminpanel, Verlauf: „Weiterschauen“ und „Verlauf“ sind jetzt zwei getrennte Karten mit je einer Kurzerklärung (Quelle, Aufgabe), Eintragszähler und eigener Paginierung (12 pro Seite; vorher war „Weiterschauen“ auf die 40 neuesten begrenzt). Einträge gelöschter Profile tragen den Hinweis „Gelöschtes Profil“ statt einer rohen ID, dazu ein Hinweis mit Verweis auf die Danger Zone. Poster: Die Erkennung akzeptiert Pfade und volle TMDB-Adressen; im echten Dump waren 549 von 627 Postern des Verlaufs volle Adressen. Im Demo-Server geprüft.
+
+- Adminpanel, Danger Zone: Neuer Abschnitt „Verwaiste Profildaten“ (nur sichtbar, wenn es welche gibt) mit Button „Verwaiste Daten entfernen“ und Bestätigung. Er entfernt aus dem Snapshot die Reste gelöschter Profile (Weiterschauen, „dismissed“-Liste, Gesehen-Listen, Trakt/MDBList, Kataloge, Zeitstempel usw.). Bestehende Profile und vorhandene Lösch-Vermerke bleiben unverändert. Neue Operation `cleanup_orphan_profiles` (Protokoll: „Verwaiste Profildaten entfernt“); die Kontoübersicht liefert `orphanProfiles`.
+
+- Backend, Profil löschen: Der Admin-Befehl entfernte bisher nur 8 von über 20 profilbezogenen Bereichen und schrieb keinen Lösch-Vermerk. Dadurch blieben Weiterschauen, „dismissed“-Liste, Gesehen-Listen, Trakt/MDBList, versteckte Kataloge, Host-Overrides, Avatar-Bild und alle Zeitstempel des Profils im Snapshot, und ein Gerät mit dem Profil hätte es zurückbringen können. Jetzt werden alle Bereiche entfernt, der Vermerk `profileDeletedAtById` gesetzt (wie in der App) und ein aktives gelöschtes Profil durch das erste verbleibende ersetzt. Gegen den echten Dump geprüft: 20 von 134 Accounts hatten Reste (31 Profile, 27 ohne Lösch-Vermerk), die Bereinigung ändert dort keine bestehenden Profile und spart zusammen rund 1 MB. Nicht bereinigt wird die Tabelle `watch_history`: 6 von 627 Einträgen gehören zu gelöschten Profilen. Neue Tests.
+
+## [2.6.024] - 2026-11-24
+
+- Android, Profil löschen: Reste gelöschter Profile werden jetzt aus dem Cloud-Snapshot entfernt. Bisher blieben Weiterschauen, „dismissed“-Liste, Gesehen-Listen, Trakt-/MDBList-Zuordnung, Kataloge, Playlists und Zeitstempel eines gelöschten Profils für immer im Snapshot, weil der Abgleich die Profil-IDs aus Server- und Gerätestand vereinigt. Neu räumt `pruneDeletedProfileState` als letzter Schritt des Push-Abgleichs und beim Löschen auf, aber nur für ein Profil, das einen Lösch-Vermerk hat **und** nicht mehr in der Profilliste steht. Ein Profil, das nur in einer veralteten Liste fehlt, bleibt unberührt; die Vermerke selbst bleiben bestehen. Die „dismissed“-Liste (entfernte Weiterschauen-Titel) wird bewusst nicht nach Alter gekürzt, weil entfernte Titel sonst wieder auftauchen könnten. Neue Unit-Tests (956 Android-Tests grün). Nicht geprüft: auf einem Gerät.
+
 ## [Backend 1.0.064] - 2026-11-24
 
 - Adminpanel, Einstellungen: Die Auswahlfelder sind jetzt die eigenen Dropdowns der Oberfläche statt der nativen Browser-Liste (Akzentfarbe, abgerundete Liste, gewählter Eintrag hervorgehoben, Bedienung mit Tastatur). Der doppelte Rahmen bei aktivem Feld ist weg: Es bleibt nur der Akzent-Rahmen, der zusätzliche Leuchtring entfällt bei allen Dropdowns im Adminpanel. Schrift und Höhe sind an die Zeilen angepasst, lange Einträge werden gekürzt statt umgebrochen.

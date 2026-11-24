@@ -1306,6 +1306,21 @@ tbody tr[data-account-id]:focus {
   border-radius: var(--radius);
   background: var(--surface);
 }
+.maintenance-actions {
+  display: grid;
+  gap: 18px;
+}
+.maintenance-action {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.maintenance-action .rc-heading,
+.maintenance-action .muted {
+  margin: 0;
+}
 .account-actions-maintenance .muted {
   margin: 0;
   max-width: 80ch;
@@ -3020,6 +3035,33 @@ tbody tr[data-account-id]:focus .account-primary {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.02);
+}
+.history-cards,
+.history-panel {
+  display: grid;
+  gap: 16px;
+}
+.history-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.history-card-head h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+.history-card-head .rc-hint {
+  margin: 0;
+}
+.history-note {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 12px;
 }
 .history-poster {
   flex: none;

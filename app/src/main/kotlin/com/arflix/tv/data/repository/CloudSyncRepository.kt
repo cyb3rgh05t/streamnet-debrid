@@ -426,6 +426,66 @@ internal fun mergeProfilesForPush(localPayload: String, remotePayload: String): 
     }.getOrDefault(localPayload)
 }
 
+// Snapshot objects keyed by profile id. Keep in sync with what buildCloudSnapshotJson writes per profile.
+private val profileScopedObjectKeys = listOf(
+    "profileSettingsById",
+    "traktTokens",
+    "mdbListSyncByProfile",
+    "dismissedContinueWatchingByProfile",
+    "localContinueWatchingByProfile",
+    "localWatchedMoviesByProfile",
+    "localWatchedEpisodesByProfile",
+    "localWatchedMovieChangesByProfile",
+    "localWatchedEpisodeChangesByProfile",
+    "addonsByProfile",
+    "catalogsByProfile",
+    "hiddenPreinstalledByProfile",
+    "hiddenAddonByProfile",
+    "hiddenHomeServerByProfile",
+    "hiddenCustomByProfile",
+    "catalogsUpdatedAtByProfile",
+    "iptvByProfile",
+    "watchlistByProfile",
+    "watchlistUpdatedAtByProfile",
+    "watchlistRemovedByProfile",
+    "streamNetHostOverridesByProfile",
+)
+
+/**
+ * Drops what is left of deleted profiles: their entries in every per-profile container and their
+ * per-field timestamps. Only a profile with a deletion tombstone that is also absent from the
+ * profile list is touched, so a profile that merely is missing from a stale device's list is safe.
+ * Returns how many profiles were cleaned.
+ */
+internal fun pruneDeletedProfileState(root: JSONObject): Int {
+    val tombstones = root.optJSONObject("profileDeletedAtById") ?: return 0
+    val profiles = root.optJSONArray("profiles") ?: return 0
+    val existing = (0 until profiles.length()).mapNotNull { profiles.optJSONObject(it)?.optString("id") }
+        .filter { it.isNotBlank() }.toSet()
+    // Without any known profile the list itself may be broken; never clean in that case.
+    if (existing.isEmpty()) return 0
+    val deleted = tombstones.keys().asSequence()
+        .filter { tombstones.optLong(it, 0L) > 0L && it !in existing }.toList()
+    if (deleted.isEmpty()) return 0
+    deleted.forEach { profileId ->
+        profileScopedObjectKeys.forEach { containerKey ->
+            root.optJSONObject(containerKey)?.remove(profileId)
+        }
+    }
+    root.optJSONObject("fieldUpdatedAt")?.let { stamps ->
+        val prefixes = deleted.flatMap { listOf("p:$it:", "i:$it:") }
+        stamps.keys().asSequence().toList()
+            .filter { key -> prefixes.any { key.startsWith(it) } }
+            .forEach { stamps.remove(it) }
+    }
+    return deleted.size
+}
+
+internal fun pruneDeletedProfileState(payload: String): String = runCatching {
+    val root = JSONObject(payload)
+    if (pruneDeletedProfileState(root) > 0) root.toString() else payload
+}.getOrDefault(payload)
+
 private fun preserveRemoteOnlyProfileState(
     local: JSONObject,
     remote: JSONObject,
@@ -435,28 +495,6 @@ private fun preserveRemoteOnlyProfileState(
     val remoteOnlyProfileIds = survivingProfileIds - localProfileIds
     if (remoteOnlyProfileIds.isEmpty()) return
 
-    val profileScopedObjectKeys = listOf(
-        "profileSettingsById",
-        "traktTokens",
-        "mdbListSyncByProfile",
-        "dismissedContinueWatchingByProfile",
-        "localContinueWatchingByProfile",
-        "localWatchedMoviesByProfile",
-        "localWatchedEpisodesByProfile",
-        "localWatchedMovieChangesByProfile",
-        "localWatchedEpisodeChangesByProfile",
-        "addonsByProfile",
-        "catalogsByProfile",
-        "hiddenPreinstalledByProfile",
-        "hiddenAddonByProfile",
-        "hiddenHomeServerByProfile",
-        "hiddenCustomByProfile",
-        "catalogsUpdatedAtByProfile",
-        "iptvByProfile",
-        "watchlistByProfile",
-        "watchlistUpdatedAtByProfile",
-        "watchlistRemovedByProfile",
-    )
     profileScopedObjectKeys.forEach { containerKey ->
         val remoteContainer = remote.optJSONObject(containerKey) ?: return@forEach
         val localContainer = local.optJSONObject(containerKey)
@@ -1804,7 +1842,8 @@ class CloudSyncRepository @Inject constructor(
             gson = gson,
         )
         val traktMergedPayload = mergeRemoteTraktTokens(historyMergedPayload, remotePayload)
-        return mergeRemoteTrackingPreferences(traktMergedPayload, remotePayload)
+        // Last step: the merges above mix the remote state back in, including deleted profiles.
+        return pruneDeletedProfileState(mergeRemoteTrackingPreferences(traktMergedPayload, remotePayload))
     }
 
     private fun mergeWatchlistByTimestamp(localPayload: String, remotePayload: String): String {

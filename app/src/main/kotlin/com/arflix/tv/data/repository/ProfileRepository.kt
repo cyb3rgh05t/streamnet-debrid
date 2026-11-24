@@ -235,6 +235,7 @@ class ProfileRepository @Inject constructor(
             val merged = JSONObject(mergeProfilesForPush(root.toString(), existingPayload))
             root.put("profiles", merged.optJSONArray("profiles") ?: JSONArray())
             root.put("profileAvatarImagesById", merged.optJSONObject("profileAvatarImagesById") ?: JSONObject())
+            if (!deletedProfileId.isNullOrBlank()) pruneDeletedProfileState(root)
             root.put("userId", userId)
         }
     }

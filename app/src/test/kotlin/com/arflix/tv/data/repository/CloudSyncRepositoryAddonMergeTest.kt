@@ -147,6 +147,35 @@ class CloudSyncRepositoryAddonMergeTest {
     }
 
     @Test
+    fun `leftovers of a deleted profile are removed but only with a tombstone`() {
+        val payload = """{"profiles":[{"id":"main","name":"Main"}],"profileDeletedAtById":{"old":200},
+            "localContinueWatchingByProfile":{"main":[{"id":1}],"old":[{"id":2}],"never-deleted":[{"id":3}]},
+            "dismissedContinueWatchingByProfile":{"main":"movie:1,5","old":"movie:2,5"},
+            "iptvByProfile":{"main":{},"old":{}},"streamNetHostOverridesByProfile":{"old":{"a":"b"}},
+            "fieldUpdatedAt":{"p:main:accentColor":1,"p:old:accentColor":2,"i:old:m3uUrl":3,"g:dnsProvider":4}}"""
+
+        val cleaned = JSONObject(pruneDeletedProfileState(payload))
+
+        assertEquals(setOf("main", "never-deleted"), cleaned.getJSONObject("localContinueWatchingByProfile").keys().asSequence().toSet())
+        assertEquals(setOf("main"), cleaned.getJSONObject("dismissedContinueWatchingByProfile").keys().asSequence().toSet())
+        assertFalse(cleaned.getJSONObject("iptvByProfile").has("old"))
+        assertFalse(cleaned.getJSONObject("streamNetHostOverridesByProfile").has("old"))
+        assertEquals(setOf("p:main:accentColor", "g:dnsProvider"), cleaned.getJSONObject("fieldUpdatedAt").keys().asSequence().toSet())
+        // The tombstone itself must stay so other devices keep honouring the deletion.
+        assertEquals(200L, cleaned.getJSONObject("profileDeletedAtById").getLong("old"))
+    }
+
+    @Test
+    fun `pruning never touches a profile that still exists or a payload without profiles`() {
+        val recreated = """{"profiles":[{"id":"old","name":"Back"}],"profileDeletedAtById":{"old":200},"localContinueWatchingByProfile":{"old":[{"id":2}]}}"""
+        assertEquals(recreated, pruneDeletedProfileState(recreated))
+        val noProfiles = """{"profiles":[],"profileDeletedAtById":{"old":200},"localContinueWatchingByProfile":{"old":[{"id":2}]}}"""
+        assertEquals(noProfiles, pruneDeletedProfileState(noProfiles))
+        val noTombstone = """{"profiles":[{"id":"main"}],"localContinueWatchingByProfile":{"ghost":[{"id":2}]}}"""
+        assertEquals(noTombstone, pruneDeletedProfileState(noTombstone))
+    }
+
+    @Test
     fun `newer settings lock survives a profile with newer general metadata`() {
         val local = """{"profiles":[{"id":"main","name":"Local","lastUsedAt":100,"settingsPin":"local-pin","settingsLocked":true,"settingsLockUpdatedAt":300}]}"""
         val remote = """{"profiles":[{"id":"main","name":"Remote","lastUsedAt":200,"settingsPin":"remote-pin","settingsLocked":false,"settingsLockUpdatedAt":150}]}"""

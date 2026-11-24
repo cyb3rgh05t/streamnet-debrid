@@ -6,8 +6,8 @@
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <title>StreamNet Admin</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin/admin.css?v=1.0.064" />
-    <script src="/admin/admin.js?v=1.0.064" defer></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=1.0.065" />
+    <script src="/admin/admin.js?v=1.0.065" defer></script>
   </head>
   <body>
     <div id="page-loading"></div>
@@ -1533,12 +1533,41 @@
                   <h2 id="account-history-title">Weiterschauen &amp; Verlauf</h2>
                 </div>
               </div>
+              <p class="rc-hint">
+                Zwei Listen mit unterschiedlicher Aufgabe: <strong>Weiterschauen</strong> ist die Liste,
+                die die App auf der Startseite zeigt. <strong>Verlauf</strong> ist das Protokoll aller
+                gespeicherten Wiedergaben.
+              </p>
               <div id="history-profiles" class="rc-tab-switch"></div>
-              <h3 class="rc-heading">Weiterschauen</h3>
-              <div id="history-continue" class="history-list"></div>
-              <h3 class="rc-heading">Verlauf</h3>
-              <div id="history-list" class="history-list"></div>
-              <div id="history-pagination" class="pagination-bar"></div>
+              <section class="rc-inv-card history-card" aria-labelledby="history-continue-title">
+                <header class="history-card-head">
+                  <div>
+                    <h3 id="history-continue-title">Weiterschauen</h3>
+                    <p class="rc-hint">
+                      Was die App auf der Startseite unter „Weiterschauen“ zeigt. Quelle: Cloud-Snapshot.
+                      Ein Titel verschwindet hier, wenn er in der App entfernt wurde.
+                    </p>
+                  </div>
+                  <span id="history-continue-count" class="count-badge"></span>
+                </header>
+                <p id="history-continue-note" class="history-note hidden"></p>
+                <div id="history-continue" class="history-list"></div>
+                <div id="history-continue-pagination" class="pagination-bar"></div>
+              </section>
+              <section class="rc-inv-card history-card" aria-labelledby="history-list-title">
+                <header class="history-card-head">
+                  <div>
+                    <h3 id="history-list-title">Verlauf</h3>
+                    <p class="rc-hint">
+                      Alle gespeicherten Wiedergaben, neueste zuerst. Quelle: Datenbank. Einträge bleiben
+                      bestehen, auch wenn ein Titel unter „Weiterschauen“ entfernt wurde.
+                    </p>
+                  </div>
+                  <span id="history-count" class="count-badge"></span>
+                </header>
+                <div id="history-list" class="history-list"></div>
+                <div id="history-pagination" class="pagination-bar"></div>
+              </section>
             </section>
           </div>
           <div class="rc-panel hidden" data-acc-panel="settings">
@@ -1686,28 +1715,52 @@
                 Konto löschen
               </button>
             </div>
+            <div id="orphan-profiles" class="account-actions-maintenance hidden">
+              <h3 class="rc-heading">Verwaiste Profildaten</h3>
+              <p id="orphan-profiles-text" class="muted"></p>
+              <div class="account-actions">
+                <button id="cleanup-orphan-profiles-button" class="button secondary" type="button">
+                  Verwaiste Daten entfernen
+                </button>
+              </div>
+            </div>
             <details class="account-actions-advanced">
               <summary>Erweitert</summary>
-              <div class="account-actions-maintenance">
+              <div class="account-actions-maintenance maintenance-actions">
                 <p class="muted">
-                  Offline-Verlauf löschen entfernt nur alte Gerätehistorie. Die
-                  Bereinigung kann zusätzlich ältere, noch gültige Logins
-                  widerrufen.
+                  Beide Aktionen betreffen nur Geräte- und Login-Daten dieses Accounts. Profile,
+                  Snapshot, Weiterschauen und Verlauf bleiben unberührt. Sie lassen sich nicht rückgängig machen.
                 </p>
-                <div class="account-actions">
+                <div class="maintenance-action">
+                  <h3 class="rc-heading">Offline-Geräte entfernen</h3>
+                  <p class="muted">
+                    Löscht alle Geräte, die gerade nicht online sind (seit mehr als 90 Sekunden kein
+                    Lebenszeichen), samt ihrer Ereignisse aus der Geräteliste. Geräte, die jetzt online sind,
+                    bleiben. Ein entferntes Gerät erscheint wieder, sobald es sich neu meldet. Sinnvoll für alte
+                    oder ersetzte Geräte.
+                  </p>
                   <button
                     id="reset-offline-devices-button"
                     class="button secondary"
                     type="button"
                   >
-                    Offline-Verlauf zurücksetzen
+                    Offline-Geräte entfernen
                   </button>
+                </div>
+                <div class="maintenance-action">
+                  <h3 class="rc-heading">Alte Ereignisse &amp; doppelte Logins bereinigen</h3>
+                  <p class="muted">
+                    Pro Gerät bleibt nur der neueste Ereigniseintrag, ältere werden gelöscht (auch bei
+                    Online-Geräten). Außerdem werden doppelte gültige Logins abgemeldet: Bei gleichem Client,
+                    gleicher Browser-Kennung und gleicher IP-Adresse bleibt nur der neueste. Zwei verschiedene Geräte
+                    mit gleicher Kennung und IP zählen als ein Client; das ältere müsste sich neu anmelden.
+                  </p>
                   <button
                     id="cleanup-devices-sessions-button"
                     class="button secondary"
                     type="button"
                   >
-                    Geräte & Sessions bereinigen
+                    Ereignisse &amp; Logins bereinigen
                   </button>
                 </div>
               </div>
