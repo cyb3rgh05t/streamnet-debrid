@@ -127,7 +127,6 @@ class CloudSyncCoordinator @Inject constructor(
         return when (scope) {
             CloudSyncScope.LOCAL_HISTORY -> 1_000L
             CloudSyncScope.IPTV -> 400L
-            CloudSyncScope.PLUGINS -> 600L
             else -> 200L
         }
     }

@@ -71,7 +71,7 @@ export const parityFeatures: ParityFeature[] = [
     webSource: "addons",
     status: "partial",
     browserDifference:
-      "Stremio-compatible manifests and direct streams exist; Android-only Cloudstream/runtime plugins are blocked in browser.",
+      "Stremio-compatible manifests and direct streams exist.",
   },
   {
     id: "livetv",

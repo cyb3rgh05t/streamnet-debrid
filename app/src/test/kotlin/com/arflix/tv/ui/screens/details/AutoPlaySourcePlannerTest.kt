@@ -10,12 +10,11 @@ import org.junit.Test
 class AutoPlaySourcePlannerTest {
     @Test
     fun `empty source list stays loading until every provider finishes`() {
-        assertTrue(emptySourceSearchStillLoading(false, false, true, true, true))
-        assertTrue(emptySourceSearchStillLoading(false, true, false, true, true))
-        assertTrue(emptySourceSearchStillLoading(false, true, true, false, true))
-        assertTrue(emptySourceSearchStillLoading(false, true, true, true, false))
-        assertFalse(emptySourceSearchStillLoading(false, true, true, true, true))
-        assertFalse(emptySourceSearchStillLoading(true, false, false, false, false))
+        assertTrue(emptySourceSearchStillLoading(false, false, true, true))
+        assertTrue(emptySourceSearchStillLoading(false, true, false, true))
+        assertTrue(emptySourceSearchStillLoading(false, true, true, false))
+        assertFalse(emptySourceSearchStillLoading(false, true, true, true))
+        assertFalse(emptySourceSearchStillLoading(true, false, false, false))
     }
 
     @Test

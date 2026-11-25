@@ -694,7 +694,6 @@ class CloudSyncRepository @Inject constructor(
     private val watchlistRepository: WatchlistRepository,
     private val profileAvatarImageManager: ProfileAvatarImageManager,
     private val invalidationBus: CloudSyncInvalidationBus,
-    private val pluginDataStore: com.arflix.tv.data.local.PluginDataStore,
     private val syncProviderStore: com.arflix.tv.data.repository.sync.SyncProviderStore
 ) {
     private companion object {
@@ -1592,15 +1591,6 @@ class CloudSyncRepository @Inject constructor(
         root.put("iptvFavoriteGroups", JSONArray(gson.toJson(iptvRepository.observeFavoriteGroups().first())))
         root.put("iptvFavoriteChannels", JSONArray(gson.toJson(iptvRepository.observeFavoriteChannels().first())))
 
-        // Plugin repositories and scrapers (sideload flavor)
-        runCatching {
-            val pluginRepos = pluginDataStore.repositories.first()
-            val pluginScrapers = pluginDataStore.scrapers.first()
-            val pluginsEnabled = pluginDataStore.pluginsEnabled.first()
-            root.put("pluginRepositories", JSONArray(gson.toJson(pluginRepos)))
-            root.put("pluginScrapers", JSONArray(gson.toJson(pluginScrapers)))
-            root.put("pluginsEnabled", pluginsEnabled)
-        }
 
         // Informational
         val isTraktLinked = traktRepository.hasTrakt()
@@ -2156,7 +2146,6 @@ class CloudSyncRepository @Inject constructor(
         // Continue Watching is backed by the separate /watch-history API. An
         // account snapshot restore does not change that data, so keep its cache
         // warm and avoid refetching it after every CloudSync pull.
-        applyCloudPlugins(root)
 
         // Reset the per-field baseline/timestamps to the merged result so the next snapshot build
         // does not see remote-applied values as fresh local changes (ping-pong guard). If we
@@ -2820,22 +2809,5 @@ class CloudSyncRepository @Inject constructor(
             traktRepository.importLocalWatchedChangesForProfiles(movieChanges, episodeChanges)
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_local_watched")) }
 
-    }
-
-    private suspend fun applyCloudPlugins(root: JSONObject) {
-        // Restore plugin repositories and scrapers
-        runCatching {
-            root.optJSONArray("pluginRepositories")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
-                val type = com.google.gson.reflect.TypeToken.getParameterized(List::class.java, com.arflix.tv.domain.model.PluginRepository::class.java).type
-                val repos: List<com.arflix.tv.domain.model.PluginRepository> = gson.fromJson(json, type) ?: emptyList()
-                if (repos.isNotEmpty()) pluginDataStore.saveRepositories(repos)
-            }
-            root.optJSONArray("pluginScrapers")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
-                val type = com.google.gson.reflect.TypeToken.getParameterized(List::class.java, com.arflix.tv.domain.model.ScraperInfo::class.java).type
-                val scrapers: List<com.arflix.tv.domain.model.ScraperInfo> = gson.fromJson(json, type) ?: emptyList()
-                if (scrapers.isNotEmpty()) pluginDataStore.saveScrapers(scrapers)
-            }
-            if (root.has("pluginsEnabled")) pluginDataStore.setPluginsEnabled(root.optBoolean("pluginsEnabled", false))
-        }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_plugins")) }
     }
 }

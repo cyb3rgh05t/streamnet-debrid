@@ -291,15 +291,11 @@ private val tvGeneralSectionIds = setOf(
     "network"
 )
 
-internal fun settingsSectionOrder(includePlugins: Boolean): List<String> = buildList {
-    addAll(listOf(
-        "appearance", "profiles", "cloud_sync", "accounts", "playback", "language",
-        "subtitles", "ai_subtitles", "iptv", "stremio", "offline_downloads",
-        "catalogs", "home_server"
-    ))
-    if (includePlugins) add("plugins")
-    addAll(listOf("network", "info_updates"))
-}
+internal fun settingsSectionOrder(): List<String> = listOf(
+    "appearance", "profiles", "cloud_sync", "accounts", "playback", "language",
+    "subtitles", "ai_subtitles", "iptv", "stremio", "offline_downloads",
+    "catalogs", "home_server", "network", "info_updates"
+)
 
 internal fun settingsAddonIndex(rowIndex: Int, addonCount: Int): Int? =
     (rowIndex - 2).takeIf { it in 0 until addonCount }
@@ -448,7 +444,7 @@ fun SettingsScreen(
     }
 
     val sections = remember {
-        settingsSectionOrder(BuildConfig.FEATURE_PLUGINS_ENABLED)
+        settingsSectionOrder()
     }
 
     val initialSectionIdx = remember(initialSection, sections) {
@@ -495,9 +491,6 @@ fun SettingsScreen(
         )
     }
     var contentFocusIndex by remember { mutableIntStateOf(0) }
-    var pluginsMaxIndex by remember { mutableIntStateOf(0) }
-    var pluginsEnterTrigger by remember { mutableIntStateOf(-1) }
-    var pluginsModalOpen by remember { mutableStateOf(false) }
     var activeZone by remember { mutableStateOf(Zone.CONTENT) }
     var suppressSelectUntilMs by remember { mutableLongStateOf(0L) }
 
@@ -627,7 +620,6 @@ fun SettingsScreen(
             "catalogs" -> uiState.catalogs.size + 1 // Add + Import + catalogs
             "stremio" -> stremioAddons.size + 1 // rows + refresh + add button
             "offline_downloads" -> uiState.offlineDownloads.size.coerceAtLeast(1) - 1
-            "plugins" -> pluginsMaxIndex
             "accounts" -> 8 // Accounts, tracking routing and Discord
             "cloud_sync" -> 3 // Cloud account, sync, pull and account deletion
             "info_updates" -> 2 // App update, privacy policy and diagnostics sharing
@@ -898,8 +890,7 @@ fun SettingsScreen(
         catalogsToDelete.isNotEmpty() ||
         uiState.isPackLoading ||
         uiState.packError != null ||
-        uiState.pendingPackManifest != null ||
-        pluginsModalOpen
+        uiState.pendingPackManifest != null
 
     BackHandler(enabled = !isTouchDevice && !hasBlockingModal) {
         when (activeZone) {
@@ -1534,9 +1525,6 @@ fun SettingsScreen(
                                                 3 -> openExternalUrl(context, ACCOUNT_DELETION_URL)
                                             }
                                         }
-                                        "plugins" -> {
-                                            pluginsEnterTrigger = contentFocusIndex
-                                        }
                                         else -> Unit
                                     }
                                 }
@@ -1858,18 +1846,6 @@ fun SettingsScreen(
                             onResumeOfflineDownload = { viewModel.resumeOfflineDownload(it) },
                             onRemoveOfflineDownload = { viewModel.removeOfflineDownload(it) }
                         )
-                        "plugins" -> {
-                            com.arflix.tv.ui.screens.plugin.PluginScreen(
-                                focusedIndex = if (activeZone == Zone.CONTENT) contentFocusIndex else -1,
-                                onFocusedIndexChanged = { contentFocusIndex = it },
-                                onMaxIndexChanged = { pluginsMaxIndex = it },
-                                enterTrigger = if (activeZone == Zone.CONTENT) pluginsEnterTrigger else -1,
-                                onEnterTriggerHandled = { pluginsEnterTrigger = -1 },
-                                onModalStateChanged = { pluginsModalOpen = it },
-                                onBackPressed = { activeZone = Zone.SECTION },
-                                onNavigateToSection = { activeZone = Zone.SECTION }
-                            )
-                        }
                         "accounts" -> AccountsSettings(
                             isTraktAuthenticated = uiState.isTraktAuthenticated,
                             traktCode = uiState.traktCode?.userCode,
@@ -4867,7 +4843,6 @@ private fun mobileCategoryTitle(page: String): String = when (page) {
     "Audio & Subtitles" -> stringResource(R.string.settings_cat_audio_subtitles)
     "Appearance" -> stringResource(R.string.interface_label)
     "Addons" -> stringResource(R.string.addons)
-    "Plugins & Extensions" -> stringResource(R.string.settings_cat_plugins_extensions)
     "Catalogs" -> stringResource(R.string.catalogs)
     "TV" -> stringResource(R.string.iptv)
     "Home Server" -> stringResource(R.string.settings_home_server)
@@ -4877,6 +4852,32 @@ private fun mobileCategoryTitle(page: String): String = when (page) {
     else -> page
 }
 
+
+@Composable
+private fun MobileSettingsNavRow(
+    icon: ImageVector,
+    page: String,
+    onNavigate: (String) -> Unit,
+    showDivider: Boolean = true
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onNavigate(page) }
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(text = mobileCategoryTitle(page), style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = TextPrimary, modifier = Modifier.weight(1f))
+            Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(20.dp))
+        }
+        if (showDivider) {
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).padding(horizontal = 16.dp).background(Color.White.copy(alpha = 0.05f)))
+        }
+    }
+}
 
 @Composable
 private fun MobileSettingsMainPage(
@@ -4899,118 +4900,10 @@ private fun MobileSettingsMainPage(
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
+        // Same group and item order as the TV settings sidebar (settingsSectionOrder).
         item {
-            MobileSettingsCategory(title = stringResource(R.string.settings_section_languages)) {
-                MobileSettingsRow(
-                    icon = Icons.Default.Language,
-                    title = stringResource(R.string.content_language),
-                    value = TMDB_LANGUAGES.firstOrNull { it.first == uiState.contentLanguage }?.second ?: uiState.contentLanguage,
-                    isToggle = false,
-                    isFocused = false,
-                    onClick = openContentLanguagePicker
-                )
-                MobileSettingsRow(
-                    icon = Icons.Default.Language,
-                    title = stringResource(R.string.streaming_region),
-                    value = streamingRegionLabel,
-                    isToggle = false,
-                    isFocused = false,
-                    onClick = openStreamingRegionPicker
-                )
-                MobileSettingsRow(
-                    icon = Icons.Default.VolumeUp,
-                    title = stringResource(R.string.default_audio),
-                    value = uiState.defaultAudioLanguage,
-                    isToggle = false,
-                    isFocused = false,
-                    onClick = openAudioLanguagePicker
-                )
-                MobileSettingsRow(
-                    icon = Icons.Default.Subtitles,
-                    title = stringResource(R.string.default_subtitle),
-                    value = uiState.defaultSubtitle,
-                    isToggle = false,
-                    isFocused = false,
-                    onClick = openSubtitlePicker
-                )
-                MobileSettingsRow(
-                    icon = Icons.Default.Subtitles,
-                    title = stringResource(R.string.secondary_subtitle),
-                    value = uiState.secondarySubtitle,
-                    isToggle = false,
-                    isFocused = false,
-                    showDivider = false,
-                    onClick = openSecondarySubtitlePicker
-                )
-            }
-        }
-
-        item {
-            MobileSettingsCategory(title = stringResource(R.string.settings_section_categories)) {
-                val categories = buildList {
-                    add("Playback & Controls" to Icons.Default.PlayArrow)
-                    add("Audio & Subtitles" to Icons.Default.Speaker)
-                    add("Appearance" to Icons.Default.Palette)
-                    add("Addons" to Icons.Default.Extension)
-                    if (BuildConfig.FEATURE_PLUGINS_ENABLED) {
-                        add("Plugins & Extensions" to Icons.Default.Extension)
-                    }
-                    add("Catalogs" to Icons.Default.Widgets)
-                    add("TV" to Icons.Default.LiveTv)
-                    add("Home Server" to Icons.Default.Cloud)
-                }
-                categories.forEachIndexed { index, (name, icon) ->
-                    Column {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onNavigate(name) }
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(imageVector = icon, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(24.dp))
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text(text = mobileCategoryTitle(name), style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = TextPrimary, modifier = Modifier.weight(1f))
-                            Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(20.dp))
-                        }
-                        if (index < categories.lastIndex) {
-                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).padding(horizontal = 16.dp).background(Color.White.copy(alpha = 0.05f)))
-                        }
-                    }
-                }
-            }
-        }
-
-        item {
-            MobileSettingsCategory(title = stringResource(R.string.settings_section_user_account)) {
-                MobileSettingsRow(
-                    icon = Icons.Default.Security,
-                    title = stringResource(R.string.settings_lock_title),
-                    subtitle = stringResource(R.string.settings_lock_description),
-                    value = if (uiState.settingsLockEnabled) "On" else "Off",
-                    isFocused = false,
-                    onClick = {
-                        if (uiState.settingsLockEnabled) {
-                            viewModel.setSettingsLockEnabled(false)
-                        } else if (uiState.hasSettingsPin) {
-                            viewModel.setSettingsLockEnabled(true)
-                        } else {
-                            onSetupSettingsPin()
-                        }
-                    }
-                )
-                MobileSettingsRow(
-                    icon = Icons.Default.VpnKey,
-                    title = stringResource(
-                        if (uiState.hasSettingsPin) R.string.settings_change_pin_title
-                        else R.string.settings_set_pin_title
-                    ),
-                    subtitle = stringResource(R.string.settings_pin_description),
-                    value = "",
-                    actionIcon = Icons.Default.Edit,
-                    isFocused = false,
-                    onClick = onSetupSettingsPin
-                )
+            MobileSettingsCategory(title = stringResource(R.string.settings_group_profile).uppercase()) {
+                MobileSettingsNavRow(Icons.Default.Palette, "Appearance", onNavigate)
                 MobileSettingsRow(
                     icon = Icons.Default.Person,
                     title = stringResource(R.string.cloud_account),
@@ -5050,6 +4943,7 @@ private fun MobileSettingsMainPage(
                     },
                     enabled = isDiscordSupported,
                     isFocused = false,
+                    showDivider = false,
                     onClick = {
                         if (isDiscordLoggedIn) {
                             com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.logout()
@@ -5057,6 +4951,95 @@ private fun MobileSettingsMainPage(
                             com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.login(context)
                         }
                     }
+                )
+            }
+        }
+
+        item {
+            MobileSettingsCategory(title = stringResource(R.string.playback).uppercase()) {
+                MobileSettingsNavRow(Icons.Default.PlayArrow, "Playback & Controls", onNavigate)
+                MobileSettingsRow(
+                    icon = Icons.Default.Language,
+                    title = stringResource(R.string.content_language),
+                    value = TMDB_LANGUAGES.firstOrNull { it.first == uiState.contentLanguage }?.second ?: uiState.contentLanguage,
+                    isToggle = false,
+                    isFocused = false,
+                    onClick = openContentLanguagePicker
+                )
+                MobileSettingsRow(
+                    icon = Icons.Default.Language,
+                    title = stringResource(R.string.streaming_region),
+                    value = streamingRegionLabel,
+                    isToggle = false,
+                    isFocused = false,
+                    onClick = openStreamingRegionPicker
+                )
+                MobileSettingsRow(
+                    icon = Icons.Default.VolumeUp,
+                    title = stringResource(R.string.default_audio),
+                    value = uiState.defaultAudioLanguage,
+                    isToggle = false,
+                    isFocused = false,
+                    onClick = openAudioLanguagePicker
+                )
+                MobileSettingsRow(
+                    icon = Icons.Default.Subtitles,
+                    title = stringResource(R.string.default_subtitle),
+                    value = uiState.defaultSubtitle,
+                    isToggle = false,
+                    isFocused = false,
+                    onClick = openSubtitlePicker
+                )
+                MobileSettingsRow(
+                    icon = Icons.Default.Subtitles,
+                    title = stringResource(R.string.secondary_subtitle),
+                    value = uiState.secondarySubtitle,
+                    isToggle = false,
+                    isFocused = false,
+                    onClick = openSecondarySubtitlePicker
+                )
+                MobileSettingsNavRow(Icons.Default.Speaker, "Audio & Subtitles", onNavigate, showDivider = false)
+            }
+        }
+
+        item {
+            MobileSettingsCategory(title = stringResource(R.string.sources).uppercase()) {
+                MobileSettingsNavRow(Icons.Default.LiveTv, "TV", onNavigate)
+                MobileSettingsNavRow(Icons.Default.Extension, "Addons", onNavigate)
+                MobileSettingsNavRow(Icons.Default.Widgets, "Catalogs", onNavigate)
+                MobileSettingsNavRow(Icons.Default.Cloud, "Home Server", onNavigate, showDivider = false)
+            }
+        }
+
+        item {
+            MobileSettingsCategory(title = stringResource(R.string.settings_group_system).uppercase()) {
+                MobileSettingsRow(
+                    icon = Icons.Default.Security,
+                    title = stringResource(R.string.settings_lock_title),
+                    subtitle = stringResource(R.string.settings_lock_description),
+                    value = if (uiState.settingsLockEnabled) "On" else "Off",
+                    isFocused = false,
+                    onClick = {
+                        if (uiState.settingsLockEnabled) {
+                            viewModel.setSettingsLockEnabled(false)
+                        } else if (uiState.hasSettingsPin) {
+                            viewModel.setSettingsLockEnabled(true)
+                        } else {
+                            onSetupSettingsPin()
+                        }
+                    }
+                )
+                MobileSettingsRow(
+                    icon = Icons.Default.VpnKey,
+                    title = stringResource(
+                        if (uiState.hasSettingsPin) R.string.settings_change_pin_title
+                        else R.string.settings_set_pin_title
+                    ),
+                    subtitle = stringResource(R.string.settings_pin_description),
+                    value = "",
+                    actionIcon = Icons.Default.Edit,
+                    isFocused = false,
+                    onClick = onSetupSettingsPin
                 )
                 MobileSettingsRow(
                     icon = Icons.Default.SystemUpdate,
@@ -5481,18 +5464,6 @@ private fun MobileSettingsSubPage(
                     onDeleteAddon = { viewModel.removeAddon(it) },
                     onAddCustomAddon = onAddCustomAddonClick,
                     onRefreshAddons = { viewModel.refreshAddons() }
-                )
-            }
-            "Plugins & Extensions" -> {
-                com.arflix.tv.ui.screens.plugin.PluginScreen(
-                    focusedIndex = -1,
-                    onFocusedIndexChanged = {},
-                    onMaxIndexChanged = {},
-                    enterTrigger = -1,
-                    onEnterTriggerHandled = {},
-                    onModalStateChanged = {},
-                    onBackPressed = { onNavigate("MAIN") },
-                    onNavigateToSection = {}
                 )
             }
             "Catalogs" -> {

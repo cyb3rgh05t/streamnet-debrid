@@ -36,11 +36,10 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 527
-        versionName = "2.6.026"
+        versionCode = 528
+        versionName = "2.6.027"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
-        buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
         // Cloud sync uses the self-hosted account backend.
         buildConfigField("Boolean", "ENABLE_TMDB_EDGE_PROXY", "false")
         buildConfigField("Boolean", "ENABLE_TRAKT_EDGE_PROXY", "false")
@@ -102,12 +101,10 @@ android {
         create("play") {
             dimension = "distribution"
             buildConfigField("Boolean", "SELF_UPDATE_ENABLED", "false")
-            buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
         }
         create("sideload") {
             dimension = "distribution"
             buildConfigField("Boolean", "SELF_UPDATE_ENABLED", "true")
-            buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "true")
         }
     }
 
@@ -258,13 +255,6 @@ val unitTestsEnabled = providers.gradleProperty("enableUnitTests").isPresent
 androidComponents {
     beforeVariants(selector().all()) {
         it.enableUnitTest = unitTestsEnabled
-    }
-}
-
-// conscrypt-android ships no desktop JNI and shadows Robolectric's bundled Conscrypt.
-configurations.configureEach {
-    if (name.contains("UnitTest") && name.endsWith("RuntimeClasspath")) {
-        exclude(group = "org.conscrypt", module = "conscrypt-android")
     }
 }
 
@@ -449,20 +439,6 @@ ksp {
     // NanoHTTPD – lightweight HTTP server for QR-based AI key setup
     implementation("org.nanohttpd:nanohttpd:2.3.1")
 
-    // Plugin system dependencies (Sideload flavor only)
-    add("sideloadImplementation", files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
-    add("sideloadImplementation", "com.fasterxml.jackson.core:jackson-databind:2.17.0")
-    add("sideloadImplementation", "com.fasterxml.jackson.module:jackson-module-kotlin:2.17.0")
-    add("sideloadImplementation", "com.github.Blatzar:NiceHttp:0.4.11")
-    add("sideloadImplementation", "org.conscrypt:conscrypt-android:2.5.3")
-    add("sideloadImplementation", "com.github.recloudstream.cloudstream:library-android:v4.7.0") {
-        exclude(group = "org.mozilla", module = "rhino")
-    }
-    // Runtime helpers used by the sideload plugin extractor stack.
-    add("sideloadImplementation", "org.mozilla:rhino:1.8.1")
-    add("sideloadImplementation", "com.google.re2j:re2j:1.8")
-    add("sideloadImplementation", "org.webjars.npm:crypto-js:4.2.0")
-
     // Lets Hilt 2.57's annotation processor read Kotlin 2.3.0 class metadata.
     ksp("org.jetbrains.kotlin:kotlin-metadata-jvm:2.3.0")
     annotationProcessor("org.jetbrains.kotlin:kotlin-metadata-jvm:2.3.0")
@@ -474,6 +450,7 @@ ksp {
     testImplementation("app.cash.turbine:turbine:1.0.0")  // Flow testing
     testImplementation("com.google.truth:truth:1.1.5")    // Better assertions
     testImplementation("org.robolectric:robolectric:4.11.1")  // Android mocking
+    testImplementation("org.json:json:20231013")  // Real org.json for plain JVM tests (android.jar only has stubs)
 
     // Android Instrumented Testing
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.06.01"))

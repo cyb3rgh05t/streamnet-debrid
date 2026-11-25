@@ -232,8 +232,6 @@ fun StreamSelector(
     completedAddons: Int = 0,
     totalAddons: Int = 0,
     streamSearchStartTime: Long = 0L,
-    pluginScrapersLoading: Boolean = false,
-    loadingPluginNames: Set<String> = emptySet(),
     onFocusedStream: (StreamSource) -> Unit = {},
     onSelect: (StreamSource) -> Unit = {},
     onDownload: (StreamSource) -> Unit = {},
@@ -256,12 +254,11 @@ fun StreamSelector(
     val addonListState = rememberLazyListState()
     val focusRequester = remember { FocusRequester() }
     val isMobile = LocalDeviceType.current.isTouchDevice()
-    val pluginPrefix = stringResource(R.string.plugin_prefix)
     val accentColor = resolveAccentColor(AccentYellow)
     var searchFeedbackStarted by remember { mutableStateOf(false) }
     var searchFeedbackUntilMs by remember { mutableStateOf(0L) }
     var emptyStateReady by remember { mutableStateOf(false) }
-    val searching = isLoading || sourceSearchActive || pluginScrapersLoading ||
+    val searching = isLoading || sourceSearchActive ||
         (totalAddons > 0 && completedAddons < totalAddons)
     LaunchedEffect(isVisible, searching, streams.isEmpty()) {
         if (!isVisible) {
@@ -594,8 +591,6 @@ fun StreamSelector(
                     completedAddons = completedAddons,
                     totalAddons = totalAddons,
                     elapsedSeconds = elapsedSeconds,
-                    pluginScrapersLoading = pluginScrapersLoading,
-                    loadingPluginNames = loadingPluginNames,
                     onFilterSelected = { index ->
                         selectedFilterIndex = index
                         focusedFilterIndex = index
@@ -727,9 +722,7 @@ fun StreamSelector(
                                     Text(
                                         text = buildString {
                                             if (elapsedSeconds > 0) append("${elapsedSeconds}s \u2022 ")
-                                            if (loadingPluginNames.isNotEmpty()) append(stringResource(R.string.plugins_loading, loadingPluginNames.joinToString(", ")))
-                                            else if (pluginScrapersLoading) append(stringResource(R.string.plugins_loading, "..."))
-                                            else if (totalAddons > 0) append(stringResource(R.string.stream_searching_addons, completedAddons, totalAddons))
+                                            if (totalAddons > 0) append(stringResource(R.string.stream_searching_addons, completedAddons, totalAddons))
                                             else append(stringResource(R.string.finding_sources))
                                         },
                                         style = ArflixTypography.body.copy(
@@ -842,8 +835,6 @@ private fun OledSourceSelectorTv(
     completedAddons: Int,
     totalAddons: Int,
     elapsedSeconds: Int = 0,
-    pluginScrapersLoading: Boolean,
-    loadingPluginNames: Set<String>,
     onFilterSelected: (Int) -> Unit,
     onAddonSelected: (Int) -> Unit,
     onSelect: (StreamSource) -> Unit,
@@ -886,7 +877,7 @@ private fun OledSourceSelectorTv(
                     Spacer(modifier = Modifier.height(5.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val stillSearchingMore =
-                            isLoading || sourceSearchActive || pluginScrapersLoading ||
+                            isLoading || sourceSearchActive ||
                                 (totalAddons > 0 && completedAddons < totalAddons)
                         if (stillSearchingMore) {
                             LoadingIndicator(color = OledMutedText, size = 13.dp, strokeWidth = 2.dp)
@@ -899,8 +890,7 @@ private fun OledSourceSelectorTv(
                                 totalAddons = totalAddons,
                                 isLoading = isLoading,
                                 sourceSearchActive = sourceSearchActive,
-                                elapsedSeconds = elapsedSeconds,
-                                pluginScrapersLoading = pluginScrapersLoading
+                                elapsedSeconds = elapsedSeconds
                             ),
                             style = ArflixTypography.caption.copy(fontSize = 13.sp),
                             color = OledMutedText,
@@ -969,8 +959,6 @@ private fun OledSourceSelectorTv(
                     totalAddons = totalAddons,
                     hasStreamingAddons = hasStreamingAddons,
                     elapsedSeconds = elapsedSeconds,
-                    pluginScrapersLoading = pluginScrapersLoading,
-                    loadingPluginNames = loadingPluginNames,
                     focusedActionIndex = focusedEmptyActionIndex,
                     onRefresh = onRefresh,
                     onRequest = onRequest
@@ -1291,11 +1279,10 @@ private fun sourceStatusText(
     totalAddons: Int,
     isLoading: Boolean,
     sourceSearchActive: Boolean,
-    elapsedSeconds: Int = 0,
-    pluginScrapersLoading: Boolean = false
+    elapsedSeconds: Int = 0
 ): String {
     val remaining = (totalAddons - completedAddons).coerceAtLeast(0)
-    val searching = isLoading || sourceSearchActive || pluginScrapersLoading
+    val searching = isLoading || sourceSearchActive
     val elapsed = if (elapsedSeconds > 0 && searching) {
         stringResource(R.string.stream_elapsed_prefix, elapsedSeconds)
     } else {
@@ -1310,7 +1297,6 @@ private fun sourceStatusText(
                 stringResource(if (remaining == 1) R.string.stream_addon_singular else R.string.stream_addon_plural),
             )
         searching -> elapsed + stringResource(R.string.stream_sources_searching, sourceCount)
-        pluginScrapersLoading -> elapsed + stringResource(R.string.stream_sources_searching_more, sourceCount)
         totalAddons > 0 -> stringResource(R.string.stream_sources_checked, sourceCount, completedAddons, totalAddons)
         else -> stringResource(R.string.stream_sources_found, sourceCount)
     }
@@ -2027,8 +2013,6 @@ private fun SourceEmptyState(
     totalAddons: Int,
     hasStreamingAddons: Boolean,
     elapsedSeconds: Int = 0,
-    pluginScrapersLoading: Boolean = false,
-    loadingPluginNames: Set<String> = emptySet(),
     message: String? = null,
     onRefresh: () -> Unit = {},
     onRequest: (() -> Unit)? = null,
@@ -2051,16 +2035,14 @@ private fun SourceEmptyState(
                 .border(1.dp, accentColor.copy(alpha = 0.22f), panelShape)
                 .padding(horizontal = 28.dp, vertical = 28.dp)
         ) {
-            val stillSearching = isLoading || sourceSearchActive || (completedAddons < totalAddons && totalAddons > 0) || pluginScrapersLoading
+            val stillSearching = isLoading || sourceSearchActive || (completedAddons < totalAddons && totalAddons > 0)
             if (stillSearching) {
                 LoadingIndicator(color = accentColor, size = 42.dp)
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
                     text = buildString {
                         if (elapsedSeconds > 0) append("${elapsedSeconds}s \u2022 ")
-                        if (loadingPluginNames.isNotEmpty()) append(stringResource(R.string.plugins_loading, loadingPluginNames.joinToString(", ")))
-                        else if (pluginScrapersLoading) append(stringResource(R.string.plugins_loading, "..."))
-                        else if (totalAddons > 0) append(stringResource(R.string.stream_searching_addons, completedAddons, totalAddons))
+                        if (totalAddons > 0) append(stringResource(R.string.stream_searching_addons, completedAddons, totalAddons))
                         else append(stringResource(R.string.finding_sources))
                     },
                     style = ArflixTypography.body.copy(fontSize = 15.sp, fontWeight = FontWeight.Medium),

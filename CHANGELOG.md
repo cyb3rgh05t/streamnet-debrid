@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.027] - 2026-11-25
+
+- Android: Das Plugin-System (CloudStream-Erweiterungen und Scraper, nur in der Sideload-Variante vorhanden) ist komplett entfernt. Der Dump zeigte: kein einziger Account hatte Plugin-Repositories oder Scraper eingetragen. Entfernt wurden der Einstellungs-Eintrag „Plugins“ (TV und Touch), die Plugin-Laufzeit samt Stubs für Sideload und Play, der Plugin-Speicher, die Plugin-Quellen in der Quellenauswahl („Plugins: …“-Ladehinweis) und der Cloud-Sync der Felder `pluginRepositories`, `pluginScrapers`, `pluginsEnabled`. Entfernt sind auch die nur dafür genutzten Bibliotheken (QuickJS, CloudStream-Library, Jackson, NiceHttp, Conscrypt, Rhino, re2j, crypto-js), das Build-Flag `FEATURE_PLUGINS_ENABLED`, die zugehörigen R8-Regeln und 44 Texte. Das Sideload-APK wird dadurch kleiner. Ältere App-Versionen schreiben die drei Felder weiter in den Snapshot; die neue Version ignoriert sie, sie bleiben dort aber liegen. Die Quellensuche über Stremio-Add-ons, Home-Server und IPTV-VOD ist unverändert. Android-Tests: 961 grün; minifizierte Builds (Sideload und Play) bauen durch. Nicht geprüft: auf einem Gerät.
+
+- Android, Touch-Einstellungen: Das Hauptmenü hat jetzt dieselbe Gruppen- und Reihenfolge wie die TV-Seitenleiste: Profil (Darstellung, Cloud-Konto, Tracking-Integrationen, Discord), Wiedergabe (Wiedergabe & Steuerung, Sprachen, Audio & Untertitel), Quellen (TV, Add-ons, Kataloge, Home-Server) und System (Einstellungs-Sperre, PIN, App-Version, Datenschutz). Inhalte der Unterseiten sind unverändert; die Sprachen-Schnellauswahl bleibt direkt im Menü. Nicht geprüft: Aussehen auf einem Gerät.
+
 ## [2.6.026] - 2026-11-25
 
 - CI, Android: Version 2.6.025 enthält keine Code-Änderung gegenüber 2.6.024; sie wurde nur gesetzt, um den an Maven-Central-Limits (HTTP 429) gescheiterten Build von 2.6.024 neu zu starten.

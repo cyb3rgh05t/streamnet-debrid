@@ -35,19 +35,12 @@ class SettingsNavigationOrderTest {
 
     @Test
     fun `appearance starts the profile category and occurs only once`() {
-        val sections = settingsSectionOrder(false)
+        val sections = settingsSectionOrder()
         assertThat(sections.take(4)).containsExactly(
             "appearance", "profiles", "cloud_sync", "accounts"
         ).inOrder()
         assertThat(sections.count { it == "appearance" }).isEqualTo(1)
-        assertThat(sections).doesNotContain("plugins")
-    }
-
-    @Test
-    fun `plugins gate preserves remaining category order`() {
-        val sections = settingsSectionOrder(true)
-        assertThat(sections.takeLast(3)).containsExactly("plugins", "network", "info_updates").inOrder()
-        assertThat(sections.filterNot { it == "plugins" }).isEqualTo(settingsSectionOrder(false))
+        assertThat(sections.takeLast(2)).containsExactly("network", "info_updates").inOrder()
     }
 
     @Test

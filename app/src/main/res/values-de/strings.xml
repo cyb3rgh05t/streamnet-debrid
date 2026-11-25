@@ -518,35 +518,7 @@
     <string name="smooth_scrolling">Flüssigeres Scrollen</string>
     <string name="smooth_scrolling_desc">Weiche, kurze Übergänge beim Wechsel zwischen Reihen und Postern mit der Fernbedienung</string>
 
-    <!-- Plugins -->
-    <string name="plugin_providers_count">%1$d Anbieter</string>
-    <string name="plugin_updated_format">Aktualisiert: %1$s</string>
-    <string name="cd_refresh">Repository aktualisieren</string>
-    <string name="cd_remove">Repository entfernen</string>
-    <string name="plugin_version">Version: %1$s</string>
-    <string name="cd_test">Plugin testen</string>
-    <string name="plugin_test_btn">Testen</string>
-    <string name="plugin_diagnostics_collapse">Diagnose ausblenden</string>
-    <string name="plugin_diagnostics_expand">Diagnose anzeigen</string>
-    <string name="plugin_test_results">Ergebnisse: %1$d</string>
-    <string name="plugin_and_more">+ %1$d weitere</string>
     <string name="error_unknown">Unbekannter Fehler</string>
-    <string name="plugin_error_invalid_url">Ungültige Repository-URL</string>
-    <string name="plugin_repo_added_with_providers">Repository mit %1$d Anbietern hinzugefügt</string>
-    <string name="plugin_error_add_repo">Repository konnte nicht hinzugefügt werden</string>
-    <string name="plugin_repo_removed">Repository entfernt</string>
-    <string name="plugin_repo_refreshed">Repository erfolgreich aktualisiert</string>
-    <string name="plugin_error_refresh">Repository konnte nicht aktualisiert werden</string>
-    <string name="plugin_test_no_results">Keine Ergebnisse gefunden</string>
-    <string name="plugin_test_found_streams">%1$d Streams gefunden</string>
-    <string name="plugin_error_test">Plugin-Test fehlgeschlagen</string>
-    <string name="plugin_confirm_confirm">Bestätigen</string>
-    <string name="plugin_risky_enable_title">Warnung</string>
-    <string name="plugin_risky_enable_message">Dieses Plugin könnte ein Risiko darstellen.</string>
-    <string name="plugin_risky_enable_cancel">Abbrechen</string>
-    <string name="plugin_risky_enable_confirm">Aktivieren</string>
-    <string name="plugin_prefix">Plugin: </string>
-    <string name="plugins_loading">Plugins: %1$s</string>
     <string name="select_category">Kategorie auswählen</string>
     <string name="channel_categories">Senderkategorien</string>
     <string name="channel_guide">Senderprogramm</string>
@@ -627,7 +599,6 @@
     <string name="settings_copy_code">Code kopieren</string>
     <string name="settings_cat_playback_controls">Wiedergabe und Steuerung</string>
     <string name="settings_cat_audio_subtitles">Audio und Untertitel</string>
-    <string name="settings_cat_plugins_extensions">Plugins und Erweiterungen</string>
     <string name="settings_section_categories">KATEGORIEN</string>
     <string name="settings_section_languages">SPRACHEN</string>
     <string name="settings_section_user_account">BENUTZER UND KONTO</string>
@@ -964,7 +935,7 @@
     <string name="settings_ua_default">Standard</string>
     <string name="settings_enter_field">%1$s eingeben...</string>
     <string name="context_press_back_cancel">Zum Abbrechen Zurück drücken</string>
-    <!-- Telegram und Plugins -->
+    <!-- Telegram -->
     <string name="telegram_connecting">Verbindung wird hergestellt...</string>
     <string name="telegram_title">Telegram</string>
     <string name="telegram_preparing_qr">QR-Code wird vorbereitet...</string>
@@ -1015,19 +986,6 @@
     <string name="discord_connected_as">Verbunden als %1$s</string>
     <string name="discord_unavailable">Nicht verfügbar</string>
     <string name="discord_help_desc">Zeigt deinen Wiedergabestatus in deinem Discord-Profil an.</string>
-    <string name="plugin_screen_title">Plugins (Test)</string>
-    <string name="plugin_screen_add_repo">Repository hinzufügen</string>
-    <string name="plugin_screen_installed_repos">Installierte Repositorys</string>
-    <string name="plugin_screen_installed_scrapers">Installierte Scraper</string>
-    <string name="plugin_screen_no_scrapers">Keine Scraper installiert.</string>
-    <string name="plugin_screen_add_repo_dialog_title">Plugin-Repository hinzufügen</string>
-    <string name="plugin_screen_repo_url">Repository-URL</string>
-    <string name="plugin_screen_reset_title">Plugins und Erweiterungen zurücksetzen</string>
-    <string name="plugin_screen_reset_desc">Löscht alle Repositorys, Scraper und lokalen Daten</string>
-    <string name="plugin_screen_reset_warning_title">Warnung</string>
-    <string name="plugin_screen_reset_warning_message">Möchtest du wirklich alle Plugins, Scraper und lokalen Codedaten löschen? Diese Aktion kann nicht rückgängig gemacht werden.</string>
-    <string name="plugin_screen_remove_repo_message">Möchtest du \"%1$s\" wirklich entfernen?</string>
-    <string name="plugin_all_cleared">Alle Plugins und Erweiterungen wurden gelöscht</string>
 
     <!-- Profile, Details, Startseite und Player -->
     <string name="collection_empty">Hier gibt es noch nichts zu sehen.</string>
@@ -1238,7 +1196,6 @@
     <string name="stream_sources_found">%1$d Quellen gefunden</string>
     <string name="stream_sources_still_checking">%1$d Quellen gefunden – noch %2$d %3$s werden geprüft</string>
     <string name="stream_sources_searching">%1$d Quellen gefunden – Quellen werden gesucht</string>
-    <string name="stream_sources_searching_more">%1$d Quellen gefunden – weitere Quellen werden gesucht</string>
     <string name="stream_addon_singular">Addon</string>
     <string name="stream_addon_plural">Addons</string>
     <string name="stream_sources_checked">%1$d Quellen gefunden – %2$d/%3$d Addons geprüft</string>
@@ -1571,7 +1528,6 @@
     <string name="crash_restart">StreamNet neu starten</string>
     <string name="previous_page">Vorherige Seite</string>
     <string name="next_page">Nächste Seite</string>
-    <string name="reset_plugins_extensions">Plugins und Erweiterungen zurücksetzen</string>
     <string name="previous_channel">Vorheriger Sender</string>
     <string name="next_channel">Nächster Sender</string>
     <string name="pause">Pause</string>
@@ -1610,7 +1566,6 @@
     <string name="settings_cloud_account_sub_title">Cloud-Sync und Konto</string>
     <string name="settings_cloud_account_sub_desc">Kontostatus, Sync-Statistiken, manuelle Sicherung und Wiederherstellung</string>
     <string name="settings_stats_addons">%1$d Stremio-Addons</string>
-    <string name="settings_stats_plugins">%1$d Erweiterungen und Plugins</string>
     <string name="settings_stats_catalogs">%1$d eingerichtete Kataloge</string>
     <string name="settings_force_push">Cloud-Push erzwingen</string>
     <string name="settings_force_push_desc">Lokale Einstellungen, Addons und Merkliste in die StreamNet Cloud hochladen</string>
