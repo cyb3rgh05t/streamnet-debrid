@@ -1,0 +1,60 @@
+name: Cleanup Old Releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep-count:
+        description: Number of newest releases to keep
+        required: true
+        default: "5"
+      keep-old-minor-releases:
+        description: Keep the latest release of each older minor version
+        type: boolean
+        default: true
+      keep-old-minor-releases-by:
+        description: Semver level used to keep old releases
+        type: choice
+        options: [major, minor, patch]
+        default: minor
+      keep-old-minor-releases-count:
+        description: Number of old releases to keep per version level
+        required: true
+        default: "1"
+      include-prerelease:
+        description: Include prerelease versions
+        type: boolean
+        default: false
+      remove-tags:
+        description: Also remove the tags of deleted releases
+        type: boolean
+        default: true
+      dry-run:
+        description: Only simulate, delete nothing
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cleanup-old-releases
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Delete old releases
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Delete old releases
+        uses: Nats-ji/delete-old-releases@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          keep-count: ${{ inputs.keep-count }}
+          keep-old-minor-releases: ${{ inputs.keep-old-minor-releases }}
+          keep-old-minor-releases-by: ${{ inputs.keep-old-minor-releases-by }}
+          keep-old-minor-releases-count: ${{ inputs.keep-old-minor-releases-count }}
+          include-prerelease: ${{ inputs.include-prerelease }}
+          remove-tags: ${{ inputs.remove-tags }}
+          dry-run: ${{ inputs.dry-run }}
