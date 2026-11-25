@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.028] - 2026-11-25
+
+- Android, D-pad-Scrolling: Die Scroll-Animation für Home, Details, Watchlist und Live-TV ist von einem pro Tastendruck neu startenden Tween auf eine gedämpfte Spring umgestellt, die die Geschwindigkeit zwischen Tastendrücken übernimmt (kein Stop-and-go mehr beim Halten der Taste; die übernommene Geschwindigkeit ist begrenzt, damit nichts über das Ziel hinausschwingt). Die horizontale Repeat-Drosselung auf Home und Details ist von 80 auf 60 ms gesenkt.
+- Android, Details und Serien: Beim Runterscrollen zu noch nicht gemessenen Reihen wird die Strecke jetzt geschätzt, animiert und der Rest nachgezogen, statt hart zu springen. Die Staffel-Reihe nutzt dieselbe Animation. Halten von Hoch/Runter bewegt den Fokus jetzt gedrosselt (230 ms) durch die Reihen, statt nach einer Reihe zu stoppen; beim Halten springt der Fokus nicht in die oder aus der Top-Bar.
+- Android, Baseline-Profil: Wildcard-Regeln für Home, Details, Watchlist, Suche, Collections, Komponenten, Navigation, Skin, Theme, Motion und Startup ergänzt. Das Profil wurde nicht neu auf einem Gerät gemessen. Android-UI-Tests grün, Debug- und ART-Profil-Build laufen durch. Nicht geprüft: Gefühl und Bildrate auf einem Gerät.
+
 ## [2.6.027] - 2026-11-25
 
 - Android: Das Plugin-System (CloudStream-Erweiterungen und Scraper, nur in der Sideload-Variante vorhanden) ist komplett entfernt. Der Dump zeigte: kein einziger Account hatte Plugin-Repositories oder Scraper eingetragen. Entfernt wurden der Einstellungs-Eintrag „Plugins“ (TV und Touch), die Plugin-Laufzeit samt Stubs für Sideload und Play, der Plugin-Speicher, die Plugin-Quellen in der Quellenauswahl („Plugins: …“-Ladehinweis) und der Cloud-Sync der Felder `pluginRepositories`, `pluginScrapers`, `pluginsEnabled`. Entfernt sind auch die nur dafür genutzten Bibliotheken (QuickJS, CloudStream-Library, Jackson, NiceHttp, Conscrypt, Rhino, re2j, crypto-js), das Build-Flag `FEATURE_PLUGINS_ENABLED`, die zugehörigen R8-Regeln und 44 Texte. Das Sideload-APK wird dadurch kleiner. Ältere App-Versionen schreiben die drei Felder weiter in den Snapshot; die neue Version ignoriert sie, sie bleiben dort aber liegen. Die Quellensuche über Stremio-Add-ons, Home-Server und IPTV-VOD ist unverändert. Android-Tests: 961 grün; minifizierte Builds (Sideload und Play) bauen durch. Nicht geprüft: auf einem Gerät.

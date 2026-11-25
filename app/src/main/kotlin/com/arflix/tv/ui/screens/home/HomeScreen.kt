@@ -654,6 +654,20 @@ private fun createHomeHeroPlaybackHandles(context: Context): HomeHeroPlaybackHan
     )
 }
 
+/** Last scroll velocity per list, so a key repeat continues the motion instead of restarting from rest. */
+private class HomeScrollMomentum(var velocity: Float = 0f, var endedAtNanos: Long = 0L)
+
+private val homeScrollMomentum =
+    java.util.Collections.synchronizedMap(java.util.WeakHashMap<androidx.compose.foundation.lazy.LazyListState, HomeScrollMomentum>())
+
+private const val HOME_SCROLL_MOMENTUM_WINDOW_NANOS = 140_000_000L
+
+/**
+ * Animates the list by [deltaPx] with a critically damped spring. Every D-pad repeat cancels and
+ * restarts this call; a fixed-duration tween would ease in from rest each time (stop-and-go), so the
+ * velocity of the interrupted motion is handed to the next one. [durationMillis] is only a speed hint
+ * (shorter = stiffer spring).
+ */
 internal suspend fun androidx.compose.foundation.lazy.LazyListState.animateHomeScrollDelta(
     deltaPx: Float,
     durationMillis: Int,
@@ -661,19 +675,45 @@ internal suspend fun androidx.compose.foundation.lazy.LazyListState.animateHomeS
 ) {
     val targetDelta = if (isRtl) -deltaPx else deltaPx
     if (abs(targetDelta) <= 1f) return
+    val stiffness = when {
+        durationMillis <= 120 -> 1_600f
+        durationMillis <= 150 -> 1_000f
+        durationMillis <= 180 -> 850f
+        else -> 700f
+    }
+    val momentum = homeScrollMomentum.getOrPut(this) { HomeScrollMomentum() }
+    val sinceLastMotionNanos = System.nanoTime() - momentum.endedAtNanos
+    val sameDirection = momentum.velocity * targetDelta > 0f
+    // A critically damped spring only overshoots when the carried velocity exceeds sqrt(stiffness) * distance.
+    val maxCarriedVelocity = kotlin.math.sqrt(stiffness) * abs(targetDelta)
+    val initialVelocity = if (sameDirection && sinceLastMotionNanos < HOME_SCROLL_MOMENTUM_WINDOW_NANOS) {
+        momentum.velocity.coerceIn(-maxCarriedVelocity, maxCarriedVelocity)
+    } else {
+        0f
+    }
     scroll(scrollPriority = MutatePriority.PreventUserInput) {
         var previousValue = 0f
-        animate(
-            initialValue = 0f,
-            targetValue = targetDelta,
-            // A short tween settles in a fixed time; the former soft spring needed ~0.6 s and restarted on every key repeat.
-            animationSpec = tween(durationMillis = durationMillis, easing = FastOutSlowInEasing)
-        ) { value, _ ->
-            val step = value - previousValue
-            if (abs(step) > 0.01f) {
-                scrollBy(step)
+        try {
+            animate(
+                initialValue = 0f,
+                targetValue = targetDelta,
+                initialVelocity = initialVelocity,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = stiffness,
+                    visibilityThreshold = 0.5f
+                )
+            ) { value, velocity ->
+                val step = value - previousValue
+                if (abs(step) > 0.01f) {
+                    scrollBy(step)
+                }
+                previousValue = value
+                momentum.velocity = velocity
+                momentum.endedAtNanos = System.nanoTime()
             }
-            previousValue = value
+        } finally {
+            if (previousValue == targetDelta) momentum.velocity = 0f
         }
     }
 }
@@ -3299,7 +3339,7 @@ private fun HomeInputLayer(
     val focusRecoveryDelayMs = 180L
     var preferredCategoryId by rememberSaveable { mutableStateOf<String?>(null) }
     val dpadRepeatGate = rememberArvioDpadRepeatGate(
-        horizontalMinRepeatIntervalMs = 80L,
+        horizontalMinRepeatIntervalMs = 60L,
         verticalMinRepeatIntervalMs = 112L
     )
     // Profile avatar is always shown when a profile exists (clickable, opens

@@ -173,6 +173,7 @@ import com.arflix.tv.ui.focus.arvioManualBringIntoViewBoundary
 import com.arflix.tv.ui.focus.arvioDpadFocusGroup
 import com.arflix.tv.ui.focus.isArvioDpadNavigationKey
 import com.arflix.tv.ui.focus.rememberArvioDpadRepeatGate
+import com.arflix.tv.ui.screens.home.animateHomeScrollDelta
 import com.arflix.tv.ui.skin.ArvioFocusableSurface
 import com.arflix.tv.ui.skin.ArvioSkin
 import com.arflix.tv.ui.skin.rememberArvioCardShape
@@ -604,8 +605,8 @@ fun DetailsScreen(
 
     // D-pad key handler — only used on TV (skipped on mobile/touch devices)
     val dpadRepeatGate = rememberArvioDpadRepeatGate(
-        horizontalMinRepeatIntervalMs = 80L,
-        verticalMinRepeatIntervalMs = 112L
+        horizontalMinRepeatIntervalMs = 60L,
+        verticalMinRepeatIntervalMs = 230L
     )
     val keyModifier = if (isMobile) Modifier else Modifier.onPreviewKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp && isArvioDpadNavigationKey(event.key)) {
@@ -619,13 +620,6 @@ fun DetailsScreen(
                         repeatCount = event.nativeKeyEvent.repeatCount,
                         nowMs = SystemClock.elapsedRealtime()
                     )
-                ) {
-                    return@onPreviewKeyEvent true
-                }
-                if (
-                    event.type == KeyEventType.KeyDown &&
-                    (event.key == Key.DirectionUp || event.key == Key.DirectionDown) &&
-                    event.nativeKeyEvent.repeatCount > 0
                 ) {
                     return@onPreviewKeyEvent true
                 }
@@ -708,16 +702,17 @@ fun DetailsScreen(
                             }
                         }
                         Key.DirectionUp -> {
+                            val isRepeat = event.nativeKeyEvent.repeatCount > 0
                             if (isSidebarFocused) {
                                 true
                             } else {
                                 if (focusedSection == FocusSection.BUTTONS) {
                                     if (summaryOverflow) focusedSection = FocusSection.DESCRIPTION
-                                    else isSidebarFocused = true
+                                    else if (!isRepeat) isSidebarFocused = true
                                 } else if (focusedSection == FocusSection.DESCRIPTION && !descriptionAtTop) {
                                     descriptionScrollRequest--
                                 } else if (focusedSection == FocusSection.DESCRIPTION) {
-                                    isSidebarFocused = true
+                                    if (!isRepeat) isSidebarFocused = true
                                 } else {
                                     focusedSection = moveDetailsVerticalFocus(uiState, focusedSection, down = false)
                                 }
@@ -726,7 +721,7 @@ fun DetailsScreen(
                         }
                         Key.DirectionDown -> {
                             if (isSidebarFocused) {
-                                isSidebarFocused = false
+                                if (event.nativeKeyEvent.repeatCount == 0) isSidebarFocused = false
                                 true
                             } else {
                                 if (focusedSection == FocusSection.DESCRIPTION) {
@@ -2346,20 +2341,26 @@ private fun DetailsTvRows(
             .collect { sizes -> sizes.forEach { (index, size) -> itemSizeCache[index] = size } }
     }
     val itemSpacingPx = with(density) { 4.dp.toPx() }
+    val unmeasuredRowPx = with(density) { 200.dp.toPx() }
     // Scroll distance (px, positive = content moves up) that puts the row at [index] on the first slot
-    // (item offset 0, the content padding is already outside the item offsets), or null when the
-    // rows in between have never been measured.
+    // (item offset 0, the content padding is already outside the item offsets). Rows that were never
+    // measured are estimated; the caller corrects the remainder once they are composed. Null only
+    // while the list has no visible items.
     fun scrollDeltaTo(index: Int): Float? {
         val layout = contentScrollState.layoutInfo
         val visible = layout.visibleItemsInfo
         visible.firstOrNull { it.index == index }?.let { return it.offset.toFloat() }
         val first = visible.firstOrNull() ?: return null
-        if (index >= first.index) return null
-        var between = 0f
-        for (i in index until first.index) {
-            between += (itemSizeCache[i] ?: return null) + itemSpacingPx
+        fun rowSize(i: Int) = visible.firstOrNull { it.index == i }?.size ?: itemSizeCache[i] ?: unmeasuredRowPx.toInt()
+        return if (index > first.index) {
+            var through = first.offset.toFloat()
+            for (i in first.index until index) through += rowSize(i) + itemSpacingPx
+            through
+        } else {
+            var between = 0f
+            for (i in index until first.index) between += rowSize(i) + itemSpacingPx
+            first.offset - between
         }
-        return first.offset - between
     }
     LaunchedEffect(item.id, currentSeason, focusedSection, contentHasFocus, descriptionScrollRequest, seasonsIdx, episodesIdx, ratingsIdx, castIdx, reviewsIdx, collectionIdx, similarIdx) {
         if (!contentHasFocus) return@LaunchedEffect
@@ -2449,9 +2450,13 @@ private fun DetailsTvRows(
                 deltaPx = deltaToTarget,
                 durationMillis = 170
             )
+            // An estimated distance leaves a remainder once the rows are measured; finish it with the same motion.
+            scrollDeltaTo(targetScrollIndex)
+                ?.takeIf { abs(it) > 2f && (it < 0f || contentScrollState.canScrollForward) }
+                ?.let { contentScrollState.animateDetailsScrollDelta(deltaPx = it, durationMillis = 120) }
             if (
                 contentScrollState.firstVisibleItemIndex != targetScrollIndex ||
-                contentScrollState.firstVisibleItemScrollOffset != 0
+                contentScrollState.firstVisibleItemScrollOffset > 2
             ) {
                 contentScrollState.scrollToItem(targetScrollIndex, 0)
             }
@@ -2642,7 +2647,7 @@ private fun DetailsSeasonRail(
         } else {
             val visibleEnd = layout.viewportEndOffset - layout.afterContentPadding
             val scrollDelta = detailsSeasonScrollDelta(focusedItem.offset, focusedItem.size, visibleEnd)
-            if (scrollDelta != 0) seasonRowState.animateScrollBy(scrollDelta.toFloat())
+            if (scrollDelta != 0) seasonRowState.animateDetailsScrollDelta(scrollDelta.toFloat(), durationMillis = 150)
         }
     }
 
@@ -3361,26 +3366,11 @@ private fun lockedDetailsRailEndPadding(
         .coerceAtLeast(minimum)
 }
 
+// Same velocity-preserving spring as Home, so Details rows and rails move with the same feel.
 private suspend fun LazyListState.animateDetailsScrollDelta(
     deltaPx: Float,
     durationMillis: Int
-) {
-    if (abs(deltaPx) <= 1f) return
-    scroll(scrollPriority = MutatePriority.PreventUserInput) {
-        var previousValue = 0f
-        animate(
-            initialValue = 0f,
-            targetValue = deltaPx,
-            animationSpec = tween(durationMillis = durationMillis, easing = FastOutSlowInEasing)
-        ) { value, _ ->
-            val step = value - previousValue
-            if (abs(step) > 0.01f) {
-                scrollBy(step)
-            }
-            previousValue = value
-        }
-    }
-}
+) = animateHomeScrollDelta(deltaPx = deltaPx, durationMillis = durationMillis)
 
 @Composable
 private fun FixedDetailsRailFocusOverlay(
