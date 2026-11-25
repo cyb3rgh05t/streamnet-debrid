@@ -16,25 +16,20 @@
 
 # ============================================
 # Log stripping for release builds
-# Remove ALL logs for maximum performance
+# Verbose/debug/info logs are removed (call and string building); warnings and errors stay.
 # ============================================
-# -assumenosideeffects class android.util.Log {
-#     public static int v(...);
-#     public static int d(...);
-#     public static int i(...);
-#     public static int w(...);
-#     public static int e(...);
-#     public static int wtf(...);
-# }
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+}
 
-# Also strip ALL our custom AppLogger methods
-# -assumenosideeffects class com.arflix.tv.util.AppLogger {
-#     public static void v(...);
-#     public static void d(...);
-#     public static void i(...);
-#     public static void w(...);
-#     public static void e(...);
-# }
+# AppLogger is a Kotlin object, so its methods are instance methods.
+-assumenosideeffects class com.arflix.tv.util.AppLogger {
+    public void v(...);
+    public void d(...);
+    public void i(...);
+}
 
 # Strip Kotlin debug assertions in release
 -assumenosideeffects class kotlin.jvm.internal.Intrinsics {

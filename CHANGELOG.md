@@ -4,6 +4,11 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.029] - 2026-11-25
+
+- Android, Performance: Im Release-Build werden `Log.v/d/i` und `AppLogger.v/d/i` samt String-Aufbau von R8 entfernt (Warnungen und Fehler bleiben). Die Compose-Stability-Config markiert die Live-TV-Kategoriebaum-Klassen und `Bitmap` als stabil; dadurch sind `SettingsUiState` (Einstellungen) und `LiveCategoryTree`/`EnrichedChannels` (Live-TV-Seitenleiste) überspringbar. Der redundante Blur-Effekt im Player-Ladebildschirm ist entfernt (der Radial-Gradient glüht bereits weich).
+- Entwicklung: Compose-Compiler-Reports per `-PcomposeReports` (nach `app/build/compose-reports`). Neues Modul `benchmark` mit Macrobenchmarks für Kaltstart, D-pad-Frame-Timing auf Home und Details sowie Baseline-Profil-Erzeugung (siehe `benchmark/README.md`). Nicht geprüft: Läufe auf einem Gerät.
+
 ## [2.6.028] - 2026-11-25
 
 - Android, D-pad-Scrolling: Die Scroll-Animation für Home, Details, Watchlist und Live-TV ist von einem pro Tastendruck neu startenden Tween auf eine gedämpfte Spring umgestellt, die die Geschwindigkeit zwischen Tastendrücken übernimmt (kein Stop-and-go mehr beim Halten der Taste; die übernommene Geschwindigkeit ist begrenzt, damit nichts über das Ziel hinausschwingt). Die horizontale Repeat-Drosselung auf Home und Details ist von 80 auf 60 ms gesenkt.

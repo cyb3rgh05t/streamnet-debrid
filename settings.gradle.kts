@@ -19,3 +19,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "StreamNet Debrid"
 include(":app")
+include(":benchmark")
