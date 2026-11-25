@@ -2586,6 +2586,21 @@ class StreamRepository @Inject constructor(
     suspend fun isIptvVodSearchEnabled(): Boolean = iptvRepository.isVodSearchEnabled()
 
     /**
+     * Episodes the IPTV provider carries for a show, only in IPTV-only mode. With another VOD source
+     * active an episode may come from there, so nothing may be hidden; null means "do not filter".
+     */
+    suspend fun getIptvOnlyEpisodeAvailability(
+        title: String,
+        tmdbId: Int?,
+        imdbId: String?,
+        year: Int?,
+        allowNetwork: Boolean = true,
+    ): SeriesEpisodeAvailability? {
+        if (!iptvRepository.observeConfig().first().iptvOnlyMode) return null
+        return iptvRepository.getSeriesEpisodeAvailability(title, tmdbId, imdbId, year, allowNetwork)
+    }
+
+    /**
      * Process raw streams into StreamSource objects -  processStreams
      */
     private fun processStreams(streams: List<StremioStream>, addon: Addon): List<StreamSource> {

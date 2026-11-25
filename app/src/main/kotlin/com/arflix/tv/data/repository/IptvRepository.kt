@@ -4554,6 +4554,63 @@ class IptvRepository @Inject constructor(
             return out.distinctBy { it.streamId }
         }
 
+        /**
+         * The episodes the provider offers for one show, or null when that cannot be said reliably
+         * (no confident match in the catalog, or no episode list could be read). Callers must treat
+         * null as "unknown, show everything": only a positive identity match may hide an episode.
+         *
+         * Series known from earlier playback and every confident catalog match are combined, because a
+         * provider may split one show over several entries; the answer is the union, which can only
+         * make more episodes count as available, never fewer.
+         */
+        suspend fun episodeAvailability(
+            providerKey: String,
+            creds: XtreamCredentials,
+            showTitle: String,
+            tmdbId: Int?,
+            imdbId: String?,
+            year: Int?,
+            allowNetwork: Boolean
+        ): SeriesEpisodeAvailability? {
+            val normalizedShow = normalizeLookupText(showTitle)
+            val normalizedTmdb = normalizeTmdbId(tmdbId)
+            val normalizedImdb = normalizeImdbId(imdbId)
+            if (normalizedShow.isBlank() && normalizedTmdb.isNullOrBlank() && normalizedImdb.isNullOrBlank()) return null
+
+            val seriesIds = LinkedHashSet<Int>()
+            seriesIds += readSeriesBinding(
+                buildSeriesBindingKeys(providerKey, normalizedTmdb, normalizedImdb, normalizedShow, year)
+            )
+            val catalog = loadCatalog(providerKey, creds, allowNetwork = allowNetwork, forceRefresh = false)
+            if (catalog.entries.isNotEmpty()) {
+                buildCandidates(catalog, normalizedShow, normalizedTmdb, normalizedImdb, year)
+                    .filter {
+                        (it.method == "tmdb_id" || it.method == "imdb_id" || it.method == "title_canonical") &&
+                            it.confidence >= 0.90f
+                    }
+                    .take(8)
+                    .forEach { seriesIds += it.entry.seriesId }
+            }
+            if (seriesIds.isEmpty()) return null
+
+            val lists = coroutineScope {
+                seriesIds.map { seriesId ->
+                    async { loadSeriesInfo(providerKey, creds, seriesId, allowNetwork) }
+                }.awaitAll()
+            }.filter { it.isNotEmpty() }
+            if (lists.isEmpty()) return null
+
+            return SeriesEpisodeAvailability(
+                episodeCheck = { season, episode ->
+                    lists.any { matchEpisodes(it, season, episode).isNotEmpty() }
+                },
+                // A provider that numbers everything as season 0/1 cannot tell seasons apart.
+                seasonCheck = { season ->
+                    lists.any { list -> list.any { it.season == season } || list.all { it.season <= 1 } }
+                }
+            )
+        }
+
         suspend fun resolveEpisodeVariants(
             providerKey: String,
             creds: XtreamCredentials,
@@ -5363,6 +5420,31 @@ class IptvRepository @Inject constructor(
             }
             sources
         }
+    }
+
+    /** Episodes the IPTV provider carries for a show; null when unknown (see [IptvSeriesResolverService.episodeAvailability]). */
+    suspend fun getSeriesEpisodeAvailability(
+        title: String,
+        tmdbId: Int?,
+        imdbId: String?,
+        year: Int?,
+        allowNetwork: Boolean = true,
+    ): SeriesEpisodeAvailability? = withContext(Dispatchers.IO) {
+        if (!isVodSearchEnabled()) return@withContext null
+        val creds = xtreamCredentialsForSeriesImport(observeConfig().first()) ?: return@withContext null
+        val activeProfileId = runCatching { profileManager.getProfileIdSync() }.getOrDefault("default")
+        val providerKey = "$activeProfileId|${xtreamCacheKey(creds)}"
+        runCatching {
+            seriesResolver.episodeAvailability(
+                providerKey = providerKey,
+                creds = creds,
+                showTitle = title,
+                tmdbId = tmdbId,
+                imdbId = imdbId,
+                year = year ?: parseYear(title),
+                allowNetwork = allowNetwork,
+            )
+        }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }.getOrNull()
     }
 
     suspend fun findEpisodeVodSource(

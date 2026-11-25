@@ -55,6 +55,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import com.arflix.tv.util.settingsDataStore
 import kotlinx.coroutines.delay
@@ -967,6 +968,7 @@ fun DetailsScreen(
                     budget = uiState.budget,
                     certification = uiState.certification,
                     seasonProgress = uiState.seasonProgress,
+                    unavailableSeasons = uiState.unavailableSeasons,
                     playLabel = uiState.playLabel,
                     showPlayFromBeginning = uiState.playPositionMs?.let { it > 0L } == true &&
                         (mediaType == MediaType.MOVIE || (
@@ -1314,6 +1316,7 @@ internal fun DetailsContent(
     budget: String? = null,
     certification: String? = null,
     seasonProgress: Map<Int, Pair<Int, Int>> = emptyMap(),
+    unavailableSeasons: Set<Int> = emptySet(),
     playLabel: String? = null,
     showPlayFromBeginning: Boolean = false,
     hasTrailer: Boolean = false,
@@ -1655,6 +1658,7 @@ internal fun DetailsContent(
                                         isFocused = false,
                                         watchedCount = currentSeasonProgress?.first ?: progress?.first ?: 0,
                                         totalCount = currentSeasonProgress?.second ?: progress?.second ?: 0,
+                                        unavailable = season in unavailableSeasons,
                                         onClick = seasonClick,
                                         onLongClick = seasonLongClick
                                     )
@@ -2244,6 +2248,7 @@ internal fun DetailsContent(
                 reviewIndex = reviewIndex,
                 similarIndex = similarIndex,
                 seasonProgress = seasonProgress,
+                unavailableSeasons = unavailableSeasons,
                 usePosterCards = usePosterCards,
                 showEpisodeRatings = showEpisodeRatings,
                 spoilerBlurEnabled = spoilerBlurEnabled,
@@ -2287,6 +2292,7 @@ private fun DetailsTvRows(
     reviewIndex: Int,
     similarIndex: Int,
     seasonProgress: Map<Int, Pair<Int, Int>>,
+    unavailableSeasons: Set<Int>,
     usePosterCards: Boolean,
     showEpisodeRatings: Boolean,
     spoilerBlurEnabled: Boolean,
@@ -2504,6 +2510,7 @@ private fun DetailsTvRows(
                         currentSeason = currentSeason,
                         episodes = episodes,
                         seasonProgress = seasonProgress,
+                        unavailableSeasons = unavailableSeasons,
                         focusSectionForUi = focusSectionForUi,
                         seasonIndex = seasonIndex,
                         contentStartPadding = contentStartPadding,
@@ -2614,6 +2621,7 @@ private fun DetailsSeasonRail(
     currentSeason: Int,
     episodes: List<Episode>,
     seasonProgress: Map<Int, Pair<Int, Int>>,
+    unavailableSeasons: Set<Int>,
     focusSectionForUi: FocusSection?,
     seasonIndex: Int,
     contentStartPadding: Dp,
@@ -2676,6 +2684,7 @@ private fun DetailsSeasonRail(
                 watchedCount = currentSeasonProgress?.first ?: progress?.first ?: 0,
                 totalCount = currentSeasonProgress?.second ?: progress?.second ?: 0,
                 useTvCategoryStyle = true,
+                unavailable = season in unavailableSeasons,
                 onClick = onClickForSeason
             )
         }
@@ -4131,6 +4140,8 @@ private fun SeasonButton(
     watchedCount: Int = 0,
     totalCount: Int = 0,
     useTvCategoryStyle: Boolean = false,
+    // The IPTV provider has nothing of this season; the button stays reachable but is dimmed.
+    unavailable: Boolean = false,
     onClick: () -> Unit = {},
     onLongClick: (() -> Unit)? = null
 ) {
@@ -4172,6 +4183,7 @@ private fun SeasonButton(
     Row(
         modifier = clickModifier
             .then(if (useTvCategoryStyle) Modifier.height(36.dp).clip(shape) else Modifier)
+            .then(if (unavailable) Modifier.alpha(0.4f) else Modifier)
             .background(backgroundColor, shape)
             .border(
                 width = if (isFocused) 2.dp else 1.dp,

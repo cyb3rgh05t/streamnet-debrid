@@ -25,6 +25,7 @@ import com.arflix.tv.data.repository.HomeServerRepository
 import com.arflix.tv.data.repository.LauncherContinueWatchingRepository
 import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.data.repository.ProfileManager
+import com.arflix.tv.data.repository.SeriesEpisodeAvailability
 import com.arflix.tv.data.repository.StreamRepository
 import com.arflix.tv.data.repository.providerScopedStreamIdentity
 import com.arflix.tv.data.repository.TraktRepository
@@ -40,10 +41,14 @@ import com.arflix.tv.util.settingsDataStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -104,6 +109,8 @@ data class DetailsUiState(
     val initialSeasonIndex: Int = 0,
     // Season progress: Map<seasonNumber, Pair<watchedCount, totalCount>>
     val seasonProgress: Map<Int, Pair<Int, Int>> = emptyMap(),
+    // IPTV-only mode: seasons the provider does not carry at all (their TMDB list stays visible).
+    val unavailableSeasons: Set<Int> = emptySet(),
     val playSeason: Int? = null,
     val playEpisode: Int? = null,
     val playTmdbSeason: Int? = null,
@@ -267,7 +274,12 @@ class DetailsViewModel @Inject constructor(
     }
 
     private val _uiState = MutableStateFlow(DetailsUiState())
-    val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
+    // What the IPTV provider carries for the open show; null = unknown or not filtering.
+    private val episodeAvailability = MutableStateFlow<SeriesEpisodeAvailability?>(null)
+    private var episodeAvailabilityJob: Job? = null
+    // The screen sees the episodes the provider offers; everything in this class keeps working on _uiState.
+    val uiState: StateFlow<DetailsUiState> = combine(_uiState, episodeAvailability, ::applyEpisodeAvailability)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, _uiState.value)
 
     private var currentMediaType: MediaType = MediaType.MOVIE
     private var currentMediaId: Int = 0
@@ -405,9 +417,13 @@ class DetailsViewModel @Inject constructor(
     }
 
     fun loadDetails(mediaType: MediaType, mediaId: Int, initialSeason: Int? = null, initialEpisode: Int? = null) {
+        val sameMediaAsBefore = currentMediaType == mediaType && currentMediaId == mediaId
         currentMediaType = mediaType
         currentMediaId = mediaId
         animeSeasonStructure = null
+        // Returning to the same show (e.g. from the player) keeps the answer, so the list does not jump.
+        if (!sameMediaAsBefore) episodeAvailability.value = null
+        episodeAvailabilityJob?.cancel()
         initialLoadComplete = false
         vodAppendJob?.cancel()
         homeServerAppendJob?.cancel()
@@ -655,6 +671,17 @@ class DetailsViewModel @Inject constructor(
                 )
                 _uiState.value = baseState
 
+                if (mediaType == MediaType.TV &&
+                    !animeMapper.isAnimeContent(mediaId, mergedItem.genreIds, mergedItem.originalLanguage)
+                ) {
+                    loadEpisodeAvailability(
+                        mediaId = mediaId,
+                        title = mergedItem.title,
+                        year = mergedItem.year.toIntOrNull(),
+                        imdbId = externalIdsDeferred,
+                    )
+                }
+
                 // ARM/Kitsu may expose several anime seasons for a single TMDB season. Resolve this
                 // after the fast TMDB details path and only replace the UI when the mapping is
                 // complete; otherwise the existing TMDB structure remains untouched.
@@ -683,6 +710,8 @@ class DetailsViewModel @Inject constructor(
                         val animeEpisodes = loadAnimeDisplaySeason(mediaId, requestedDisplaySeason, structure)
                         if (animeEpisodes.isEmpty() || !isCurrentRequest()) return@launch
                         animeSeasonStructure = structure
+                        // Provider numbering cannot be mapped onto remapped anime seasons.
+                        episodeAvailability.value = null
                         updateState { state ->
                             state.copy(
                                 totalSeasons = structure.seasonCount,
@@ -1140,6 +1169,29 @@ class DetailsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * IPTV-only mode: asks which episodes the provider carries. Cached provider data answers first so the
+     * list is right on the first frame when the show was seen before; the network answer follows.
+     */
+    private fun loadEpisodeAvailability(
+        mediaId: Int,
+        title: String,
+        year: Int?,
+        imdbId: kotlinx.coroutines.Deferred<ExternalIds?>,
+    ) {
+        episodeAvailabilityJob = viewModelScope.launch {
+            val imdb = runCatching { withTimeoutOrNull(2_000L) { imdbId.await() } }.getOrNull()?.imdbId
+            for (allowNetwork in listOf(false, true)) {
+                val availability = runCatching {
+                    streamRepository.getIptvOnlyEpisodeAvailability(title, mediaId, imdb, year, allowNetwork)
+                }.onFailure { if (it is CancellationException) throw it }.getOrNull()
+                if (currentMediaId != mediaId || animeSeasonStructure != null) return@launch
+                // A failed or inconclusive lookup never takes back an earlier answer.
+                if (availability != null) episodeAvailability.value = availability
+            }
+        }
+    }
+
     fun loadSeason(seasonNumber: Int) {
         if (currentMediaType != MediaType.TV) return
         // Don't reload if already on this season
@@ -1302,7 +1354,8 @@ class DetailsViewModel @Inject constructor(
                     )
                     runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
                 } else {
-                    val targetEpisode = _uiState.value.episodes.getOrNull(episodeIndex ?: 0)
+                    // The index comes from the list on screen, which may have hidden episodes.
+                    val targetEpisode = uiState.value.episodes.getOrNull(episodeIndex ?: 0)
                     if (targetEpisode == null) {
                         _uiState.value = _uiState.value.copy(
                             toastMessage = context.getString(R.string.details_no_episode_selected),

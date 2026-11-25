@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.026] - 2026-11-25
+
+- CI, Android: Version 2.6.025 enthält keine Code-Änderung gegenüber 2.6.024; sie wurde nur gesetzt, um den an Maven-Central-Limits (HTTP 429) gescheiterten Build von 2.6.024 neu zu starten.
+
+- Android, IPTV-only-Modus: In den Serien-Details werden nur noch die Episoden angezeigt, die der IPTV-Anbieter tatsächlich hat. Beim Öffnen einer Serie wird sie gegen den Anbieter-Katalog geprüft (zuerst mit den zwischengespeicherten Daten, dann mit dem Netz) und die Episodenliste der Staffel auf das gekürzt, was der Anbieter anbietet. Die Prüfung nutzt dieselbe Zuordnungsregel wie die Wiedergabe (`matchEpisodes`), eine angezeigte Episode ist also eine, die der Resolver auch abspielen kann. Der Fokus-Start (nächste ungesehene Episode) wird auf die gekürzte Liste umgerechnet. Staffeln, von denen der Anbieter nichts hat, bleiben auswählbar, sind aber abgedunkelt und zeigen weiter die vollständige TMDB-Liste (eine leere Liste würde sonst auch die Staffelauswahl ausblenden).
+  - Sicherheitsregeln: Gefiltert wird nur im IPTV-only-Modus (bei einem anderen aktiven VOD-Add-on könnte eine Episode von dort kommen), nur bei sicherer Serien-Zuordnung (TMDB-ID, IMDb-ID oder kanonischer Titel mit Konfidenz ≥ 0,90) und nur, wenn eine Episodenliste gelesen werden konnte. In allen anderen Fällen, auch bei Fehlern, bleibt die Liste unverändert. Bei mehreren Anbieter-Einträgen derselben Serie (Staffeln auf mehrere Einträge verteilt) gilt die Vereinigung. Anime mit umgeordneten Staffeln werden nicht gefiltert.
+  - Bewusst nicht geändert: „Als gesehen markieren“ und die Staffelfortschritte (Trakt) arbeiten weiter mit der vollen TMDB-Liste; Autoplay der nächsten Episode im Player und Weiterschauen prüfen den Anbieter weiterhin erst beim Abspielen. Hat der Anbieter einzelne Episoden nur als Film-VOD (Fallback), werden diese in der Liste ebenfalls ausgeblendet, wenn die Serie selbst im Serien-Katalog gefunden wird. Neue Unit-Tests (962 Android-Tests grün). Nicht geprüft: auf einem Gerät oder mit einem echten Anbieter.
+
 - CI, Android-Build: Der Release-Build wird bis zu dreimal versucht (Pause 45 s, 90 s). Der Build von 2.6.024 scheiterte nicht am Code, sondern weil Maven Central dem Runner mit HTTP 429 („Too Many Requests“) Abhängigkeiten verweigerte (kotlinx-coroutines-slf4j, tmdb-java, json u. a.). Die bisherige Wiederholung deckte nur die Plugin-Auflösung ab. Ein neuer Versuch lädt nur noch nach, was fehlt.
 
 ## [Backend 1.0.067] - 2026-11-24
