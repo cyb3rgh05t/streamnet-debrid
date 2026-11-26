@@ -1,0 +1,98 @@
+name: Cleanup Old Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: Comma-separated GHCR container package names
+        required: true
+        default: streamnet-web,streamnet-backend
+      keep-count:
+        description: Number of newest tagged versions to keep per package
+        required: true
+        default: "5"
+      dry-run:
+        description: Only simulate, delete nothing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: cleanup-old-packages
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Delete old package versions
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      OWNER: ${{ github.repository_owner }}
+      PACKAGES: ${{ inputs.packages }}
+      KEEP_COUNT: ${{ inputs.keep-count }}
+      DRY_RUN: ${{ inputs.dry-run }}
+    steps:
+      - name: Delete old package versions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! [[ "$KEEP_COUNT" =~ ^[1-9][0-9]*$ ]]; then
+            echo "keep-count must be a positive integer" >&2
+            exit 1
+          fi
+
+          owner_type="$(gh api "users/$OWNER" --jq .type)"
+          if [[ "$owner_type" == "Organization" ]]; then
+            base="orgs/$OWNER"
+          else
+            base="users/$OWNER"
+          fi
+
+          IFS=',' read -ra names <<< "$PACKAGES"
+          for name in "${names[@]}"; do
+            name="$(echo "$name" | xargs)"
+            [[ -z "$name" ]] && continue
+            echo "::group::$name"
+
+            versions="$(gh api --paginate "$base/packages/container/$name/versions?per_page=100" | jq -s 'add // []')"
+            total="$(jq 'length' <<< "$versions")"
+
+            # Only the newest tagged versions count. Untagged versions (multi-arch
+            # children, attestations) are removed only when they are older than the
+            # oldest kept tagged version, so kept images stay intact.
+            cutoff="$(jq -r --argjson n "$KEEP_COUNT" \
+              '[.[] | select((.metadata.container.tags | length) > 0)] | sort_by(.created_at) | reverse | .[$n - 1].created_at // empty' \
+              <<< "$versions")"
+
+            if [[ -z "$cutoff" ]]; then
+              echo "$total versions found, fewer than $KEEP_COUNT tagged versions. Nothing to delete."
+              echo "::endgroup::"
+              continue
+            fi
+
+            cutoff_epoch=$(( $(date -u -d "$cutoff" +%s) - 600 ))
+            ids="$(jq -r --argjson c "$cutoff_epoch" \
+              '.[] | select((.created_at | fromdateiso8601) < $c) | .id' <<< "$versions")"
+
+            if [[ -z "$ids" ]]; then
+              echo "Nothing to delete ($total versions)."
+              echo "::endgroup::"
+              continue
+            fi
+
+            count="$(wc -l <<< "$ids" | xargs)"
+            echo "Deleting $count of $total versions (keeping newest $KEEP_COUNT tagged versions)"
+            for id in $ids; do
+              if [[ "$DRY_RUN" == "true" ]]; then
+                echo "[dry-run] would delete version $id"
+              else
+                gh api -X DELETE "$base/packages/container/$name/versions/$id"
+                echo "Deleted version $id"
+              fi
+            done
+            echo "::endgroup::"
+          done
