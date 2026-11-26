@@ -4,6 +4,15 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.069] - 2026-11-26
+
+- Backend, Admin-Panel: Auswahlfelder sind jetzt klickbare Karten statt Dropdowns: Profil, Aktion und Add-on/Playlist beim Entfernen im Account sowie die Aktion und der Bereich (Franchises, Streamingdienste, Jahrzehnte, Genres) in Remote Config. Das Account-Formular ist in „Profil auswählen“ und „Aktion auswählen“ getrennt, die Schritte werden fortlaufend nummeriert. Die Karten der Playlists und Add-ons haben gleiche Größe, die Buttons stehen unten.
+- Backend, Admin-Panel: Das Panel bleibt nach einem Reload auf derselben Seite (Bereich, geöffneter Account, Tab, Remote-Config-Tab). Badges sind farbig (Aktiv grün, Deaktiviert rot, Profil blau, Version violett, Default gold, Geändert orange); „Standard“ heißt in Remote Config jetzt „Default“, geänderte Collections sind in der Liste hervorgehoben. Die Revision steht oben rechts in der Snapshot-Kachel, die Kennzahlen in der Remote-Config-Übersicht sind gleichmäßig ausgerichtet, und die Abstände zwischen Hinweis-Box, Tabs und Textfeldern sind größer.
+
+## [2.6.030] - 2026-11-26
+
+- Android, Collections: Jahrzehnte und alle übrigen Collections laden ihre Titel jetzt wie Streamingdienste und Genres beim Scrollen nach, statt bei 96 (MDBList), 120 (Add-on) bzw. 72 Titeln pro Quelle aufzuhören. Franchises müssen ihre Liste vor dem Sortieren nach Erscheinungsdatum komplett auflösen; dort ist das Limit für eine öffentliche MDBList von 96 auf 500 Titel gestiegen. Das Limit von 30 für „Einzelne Filme / Serien“, die Add-on-Quellen der Franchises (120) und TMDB-Collections (72) bleiben unverändert. `CollectionOrderingTest` grün. Nicht geprüft: auf einem Gerät.
+
 ## [Backend 1.0.068] - 2026-11-26
 
 - CI, Aufräum-Workflow: „Cleanup Old Releases“ nutzt kein `Nats-ji/delete-old-releases` mehr. Die Action konnte Tags mit führenden Nullen (`2.6.029`) nicht als Version lesen, behielt nur wenige alte Tags und hätte bei abgeschaltetem Dry-Run die neuesten Releases gelöscht. Ein eigenes Skript vergleicht die Versionen jetzt numerisch, behält die neuesten `keep-count` Releases, ignoriert Drafts, Prereleases (ohne Haken) und Tags, die nicht `x.y.z` sind, und bricht ab, falls das neueste Release gelöscht würde. Die Inputs für „ältere Minor-Versionen behalten“ sind entfernt. Mit den 196 Tags des letzten Laufs geprüft: Neueste `2.6.029`, behalten werden die fünf neuesten. Nicht geprüft: Lauf in GitHub Actions.

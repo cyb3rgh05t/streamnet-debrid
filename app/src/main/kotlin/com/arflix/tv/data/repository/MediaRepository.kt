@@ -573,17 +573,9 @@ class MediaRepository @Inject constructor(
         }
 
         val targetCount = requiredCount.coerceAtLeast(1)
-        // SERVICE and GENRE rails page through TMDB/addon catalogs on demand,
-        // so let the per-source budget grow with the user's scroll position
-        // instead of clamping at the default 72/96/120 ceiling. Timelines also
-        // grow on demand; other fixed groups keep the small cap.
-        val unlimitedGroup = catalog.collectionGroup == CollectionGroupKind.SERVICE ||
-            catalog.collectionGroup == CollectionGroupKind.GENRE ||
-            catalog.collectionGroup == CollectionGroupKind.MOVIE_GENRE ||
-            catalog.collectionGroup == CollectionGroupKind.TV_GENRE ||
-            catalog.collectionGroup == CollectionGroupKind.STUDIO ||
-            catalog.collectionGroup == CollectionGroupKind.NETWORK ||
-            catalog.collectionSources.any { it.collectionTab == "timeline" }
+        // Every collection group pages through its sources on demand, so the per-source budget grows with the
+        // user's scroll position instead of clamping at a fixed ceiling. Only a franchise sorted by release date
+        // has to resolve its whole list up front, because the page offsets depend on the final order.
 
         // Resolve all sources in parallel so a slow/failed source never blocks the
         // others — this alone fixes "empty" genre collections where one source 404s.
@@ -591,12 +583,8 @@ class MediaRepository @Inject constructor(
             if (usesFranchiseReleaseOrder(catalog)) {
                 // Resolve the fixed franchise budget before sorting to keep page offsets stable.
                 franchiseSourceBudget(source.kind)
-            } else if (unlimitedGroup) {
+            } else {
                 (targetCount + 20).coerceAtLeast(40)
-            } else when (source.kind) {
-                CollectionSourceKind.ADDON_CATALOG -> (targetCount + 12).coerceAtLeast(24).coerceAtMost(120)
-                CollectionSourceKind.MDBLIST_PUBLIC -> (targetCount + 8).coerceAtLeast(24).coerceAtMost(96)
-                else -> (targetCount + 8).coerceAtLeast(24).coerceAtMost(72)
             }
         }
         val sources = catalog.collectionSources

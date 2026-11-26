@@ -15,12 +15,13 @@ internal fun usesFranchiseReleaseOrder(catalog: CatalogConfig): Boolean =
 
 /**
  * How many titles of one source a franchise collection resolves before it is sorted by release date. A fixed
- * title list (Marvel has 120 films) must not be cut: the cap only exists for open-ended list sources.
+ * title list (Marvel has 120 films) must not be cut: the cap only exists for open-ended list sources, and a
+ * public MDBList arrives as one document, so it only costs the release-date lookups.
  */
 internal fun franchiseSourceBudget(kind: CollectionSourceKind): Int = when (kind) {
     CollectionSourceKind.CURATED_IDS -> 500
     CollectionSourceKind.ADDON_CATALOG -> 120
-    CollectionSourceKind.MDBLIST_PUBLIC -> 96
+    CollectionSourceKind.MDBLIST_PUBLIC -> 500
     else -> 72
 }
 
