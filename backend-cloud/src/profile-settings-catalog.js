@@ -159,6 +159,32 @@ export const profileSettingGroups = [
     ],
   },
   {
+    id: "iptv",
+    title: "Live TV: Playlist-Einstellungen",
+    // Stored in the profile's IPTV state, not in the profile settings; devices stamp them "i:<profileId>:<field>".
+    root: "iptvByProfile",
+    settings: [
+      {
+        field: "sortOrder", type: "select", default: "provider", label: "Senderreihenfolge",
+        hint: "Reihenfolge der Sender innerhalb jeder Gruppe.",
+        options: [choice("provider", "Anbieterreihenfolge"), choice("number", "Sendernummer"), choice("name", "Alphabetisch (A-Z)")],
+      },
+      {
+        // The app keeps this on, and ignores a change, while no streaming add-on is installed and enabled.
+        field: "iptvOnlyMode", type: "boolean", default: true, label: "Nur IPTV-Provider-Quellen", needsVodAddon: true,
+        hint: "Zeigt auf der Startseite nur Inhalte des IPTV-Anbieters.",
+      },
+      {
+        field: "vodSearchEnabled", type: "boolean", default: true, label: "IPTV-VOD-Streams", needsVodAddon: true,
+        hint: "IPTV-Filme und -Serien bei der Quellensuche berücksichtigen.",
+      },
+      {
+        field: "showSpecialCategories", type: "boolean", default: true, label: "Spezialkategorien",
+        hint: "„Alle Sender“ und zuletzt gesehene Sender in Live-TV ein- oder ausblenden.",
+      },
+    ],
+  },
+  {
     id: "language",
     title: "Sprache & Region",
     settings: [
@@ -182,12 +208,48 @@ export const profileSettingGroups = [
 
 const definitions = new Map(
   profileSettingGroups
-    .flatMap((group) => group.settings.map((setting) => ({ ...setting, scope: group.scope ?? "profile" })))
+    .flatMap((group) => group.settings.map((setting) => ({
+      ...setting,
+      scope: group.scope ?? "profile",
+      root: group.root ?? "profileSettingsById",
+    })))
     .map((setting) => [setting.field, setting]),
 );
 
 export function profileSettingDefinition(field) {
   return definitions.get(field) ?? null;
+}
+
+/** The snapshot section a per-profile setting lives in. */
+export function profileSettingRoot(field) {
+  return definitions.get(field)?.root ?? "profileSettingsById";
+}
+
+/**
+ * The app ignores a change of these (and puts them back on) while a profile has no enabled streaming add-on,
+ * so switching them off there would only be undone. Mirrors the app's isEnabledVodStreamingAddon.
+ */
+export function profileHasVodStreamingAddon(payload, profileId) {
+  const list = Array.isArray(payload?.addonsByProfile?.[profileId])
+    ? payload.addonsByProfile[profileId]
+    : Array.isArray(payload?.addons) ? payload.addons : [];
+  const vodTypes = new Set(["movie", "series", "anime"]);
+  return list.some((addon) => {
+    if (!addon || addon.isInstalled === false || addon.isEnabled === false) return false;
+    if (addon.type === "SUBTITLE" || addon.type === "METADATA") return false;
+    const resources = Array.isArray(addon.manifest?.resources) ? addon.manifest.resources : [];
+    return resources.some((resource) => {
+      const name = String(resource?.name ?? "").toLowerCase();
+      if (name !== "stream" && name !== "streams") return false;
+      const types = Array.isArray(resource.types) ? resource.types : [];
+      return !types.length || types.some((type) => vodTypes.has(String(type).toLowerCase()));
+    });
+  });
+}
+
+/** Whether a value may be written for this profile: see profileHasVodStreamingAddon. */
+export function canWriteSettingForProfile(payload, profileId, field, value) {
+  return !(definitions.get(field)?.needsVodAddon && value === false && !profileHasVodStreamingAddon(payload, profileId));
 }
 
 /** Account-wide settings live at the top of the snapshot and are stamped under "g:<field>". */
@@ -206,4 +268,17 @@ export function validateProfileSettingValue(field, value) {
   const match = definition.options.find((option) => option.value === value);
   if (!match) throw new Error(`Setting ${field} has an unsupported value`);
   return match.value;
+}
+
+/** A set of settings chosen for many accounts at once: only known fields with one of their own values. */
+export function normalizeAppSettings(input, { allowEmpty = false } = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Settings must be an object");
+  const entries = Object.entries(input);
+  if ((!entries.length && !allowEmpty) || entries.length > definitions.size) {
+    throw new Error("Settings must contain between 1 and all known fields");
+  }
+  return Object.fromEntries(entries.map(([field, value]) => {
+    if (!definitions.has(field)) throw new Error(`Unknown setting: ${field.slice(0, 60)}`);
+    return [field, validateProfileSettingValue(field, value)];
+  }));
 }

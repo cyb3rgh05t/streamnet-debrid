@@ -138,6 +138,43 @@ test("global preview performs no writes and applying advances every changed revi
   assert.equal(released(), 2);
 });
 
+test("global app settings preview without writes, apply to every account and are audited with their fields", async (t) => {
+  const { send, queries } = await fixture(t);
+  const request = { operation: "set_app_settings", data: { settings: { autoPlayNext: false, dnsProvider: "google" } } };
+  const preview = await send("POST", "/admin-api/global/preview", request);
+  assert.equal(preview.statusCode, 200);
+  assert.equal(preview.json().changed, 2);
+  assert.equal(queries.some(({ sql }) => /update account_sync|insert into admin_audit/.test(sql)), false);
+  const response = await send("PATCH", "/admin-api/global/snapshot", {
+    ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
+  });
+  assert.equal(response.statusCode, 200);
+  const updates = queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"));
+  assert.equal(updates.length, 2);
+  const next = JSON.parse(updates[0].values[1]);
+  assert.equal(next.dnsProvider, "google");
+  assert.equal(next.profileSettingsById.kids.autoPlayNext, false);
+  const audit = queries.find(({ sql }) => sql.includes("insert into admin_audit_logs"));
+  assert.equal(audit.values[3], "global_set_app_settings");
+  assert.deepEqual(JSON.parse(audit.values[5]).settings, request.data.settings);
+});
+
+test("app-setting defaults are validated, stored centrally and listed with the settings catalog", async (t) => {
+  const { app, send, queries } = await fixture(t);
+  assert.equal((await app.inject({ method: "PUT", url: "/admin-api/global/app-defaults" })).statusCode, 401);
+  const rejected = await send("PUT", "/admin-api/global/app-defaults", { settings: { subtitleSize: "Huge" } });
+  assert.equal(rejected.statusCode, 400);
+  assert.equal(queries.some(({ sql }) => sql.includes("insert into catalog_config")), false);
+  const saved = await send("PUT", "/admin-api/global/app-defaults", { settings: { autoPlayNext: false } });
+  assert.equal(saved.statusCode, 200);
+  const write = queries.find(({ sql }) => sql.includes("insert into catalog_config"));
+  assert.equal(write.values[0], "app-setting-defaults");
+  assert.deepEqual(JSON.parse(write.values[1]), { settings: { autoPlayNext: false } });
+  const overview = (await send("GET", "/admin-api/global")).json();
+  assert.ok(overview.settingsCatalog.length > 0);
+  assert.deepEqual(overview.appDefaults.settings, {});
+});
+
 test("global apply rejects stale previews without writes or automatic retry", async (t) => {
   const { send, rows, queries } = await fixture(t);
   const preview = await send("POST", "/admin-api/global/preview", addPlaylist);

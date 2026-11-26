@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { mdblistSlugPattern, normalizeAdminListUrl } from "./admin-snapshots.js";
+import { appSettingDefaultsId } from "./app-setting-defaults.js";
 
 // Central catalog configuration: what the admin changes here reaches every device, new installs and new
 // accounts included (the apps fetch GET /catalog-config and lay it over their built-in standards).
@@ -297,7 +298,7 @@ export async function readConfig(pool) {
   const rows = (await pool.query("select id, payload, revision, updated_at from catalog_config").catch((error) => {
     if (error?.code === "42P01") return { rows: [] };
     throw error;
-  })).rows;
+  })).rows.filter((row) => row.id !== appSettingDefaultsId);
   const byId = new Map(rows.map((row) => [row.id, row]));
   const franchises = Object.values(seed).map((entry) => franchiseView(entry, byId.get(`franchise:${entry.id}`), true));
   const builtinIds = new Set(Object.keys(seed));

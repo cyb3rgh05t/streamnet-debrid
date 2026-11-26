@@ -24,6 +24,7 @@ const routeActions = new Map([
   ["GET /admin-api/global", "Admin global inventory loaded"],
   ["POST /admin-api/global/preview", "Admin global changes previewed"],
   ["PATCH /admin-api/global/snapshot", "Admin global snapshots updated"],
+  ["PUT /admin-api/global/app-defaults", "Admin app defaults saved"],
   [
     "POST /admin-api/accounts/:accountId/sessions/revoke-all",
     "Admin revoked account sessions",

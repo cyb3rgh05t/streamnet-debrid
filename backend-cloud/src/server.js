@@ -20,6 +20,8 @@ import { backendLoggerOptions, registerRequestLogging } from "./logger.js";
 import { deleteAccountData } from "./account-deletion.js";
 import { isValidWatchHistoryIdentity } from "./watch-history.js";
 import { registerAdminRoutes } from "./admin-routes.js";
+import { applyAppSettingValues } from "./admin-snapshots.js";
+import { readAppSettingDefaults } from "./app-setting-defaults.js";
 import { registerPresenceRoutes } from "./presence.js";
 
 const { Pool } = pg;
@@ -1182,6 +1184,17 @@ app.route({
   },
 });
 
+// The first snapshot of an account starts with the admin's app-setting defaults. A setting the device has
+// already changed itself (it carries a field timestamp) keeps the device's value. Never blocks a sync.
+async function seedAppSettingDefaults(payload) {
+  try {
+    const { settings } = await readAppSettingDefaults(pool);
+    if (Object.keys(settings).length) applyAppSettingValues(payload, settings, Date.now(), { skipStamped: true });
+  } catch (error) {
+    app.log.warn({ err: error }, "App setting defaults could not be applied to a new snapshot");
+  }
+}
+
 app.post("/account-sync-push", async (request, reply) => {
   const account = await authenticatedAccount(request);
   const payload = request.body?.payload;
@@ -1213,6 +1226,7 @@ app.post("/account-sync-push", async (request, reply) => {
         current: current ? { payload: current.payload, revision } : null,
       });
     }
+    if (!current) await seedAppSettingDefaults(payload);
     const storedPayload = mergePushPayloadByFieldTimestamps(
       payload,
       current?.payload,

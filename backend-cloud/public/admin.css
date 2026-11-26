@@ -3128,6 +3128,36 @@ tbody tr[data-account-id]:focus .account-primary {
 .setting-row.is-default .setting-default-tag {
   display: inline-block;
 }
+.setting-set-tag,
+.setting-reset {
+  display: none;
+}
+.setting-row:not(.is-default) .setting-set-tag {
+  display: inline-block;
+}
+.setting-row:not(.is-default) .setting-reset {
+  display: inline-flex;
+  flex: none;
+}
+.rc-app-reason {
+  max-width: 520px;
+  margin-top: 18px;
+}
+#rc-app-summary {
+  margin: 14px 0 0;
+}
+#rc-appsettings .rc-actions-row {
+  margin-top: 16px;
+}
+#rc-app-message {
+  margin-top: 18px;
+}
+#rc-app-message:empty {
+  display: none;
+}
+.setting-row.is-locked {
+  opacity: 0.6;
+}
 .setting-select {
   flex: none;
   width: 190px;

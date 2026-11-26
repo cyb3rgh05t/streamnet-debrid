@@ -536,6 +536,13 @@
                 </svg>
                 <span><strong>Add-ons</strong><small>App-Add-ons · bestehende Accounts</small></span>
               </button>
+              <button type="button" class="global-category" data-rc-tab="appsettings" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1" />
+                </svg>
+                <span><strong>App-Einstellungen</strong><small>Neue und bestehende Accounts</small></span>
+              </button>
               <button type="button" class="global-category" data-rc-tab="help" aria-pressed="false">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <circle cx="12" cy="12" r="9" />
@@ -751,6 +758,25 @@
               <h3 class="rc-heading">Weitere Add-ons</h3>
               <div id="rc-extra-addons" class="rc-extra"></div>
               <div id="rc-slot-addons" class="rc-account-slot"></div>
+            </div>
+
+            <div id="rc-appsettings" class="rc-panel hidden" data-rc-panel="appsettings">
+              <p class="rc-intro">
+                App-Einstellungen für <strong>alle Accounts</strong>. Gesetzte Werte kannst du als Default für
+                <strong>neue Accounts</strong> speichern (gilt ab deren erstem Cloud-Abgleich; was ein Gerät selbst
+                geändert hat, bleibt) und mit „Auf alle bestehenden Accounts anwenden“ zusätzlich
+                bei <strong>allen bestehenden Accounts und Profilen</strong> setzen. Nicht gesetzte Einstellungen
+                behalten den Default der App.
+              </p>
+              <div id="rc-app-groups" class="settings-groups"></div>
+              <label class="rc-app-reason">Kommentar (optional)<input id="rc-app-reason" maxlength="500" /></label>
+              <p id="rc-app-summary" class="rc-hint"></p>
+              <div class="rc-actions-row">
+                <button id="rc-app-save" class="button primary" type="button">Als Default für neue Accounts speichern</button>
+                <button id="rc-app-apply" class="button secondary" type="button">Auf alle bestehenden Accounts anwenden</button>
+                <button id="rc-app-reset" class="button secondary" type="button">Alle zurücksetzen</button>
+              </div>
+              <p id="rc-app-message" class="message" role="status"></p>
             </div>
 
             <div id="rc-help" class="rc-panel hidden" data-rc-panel="help">

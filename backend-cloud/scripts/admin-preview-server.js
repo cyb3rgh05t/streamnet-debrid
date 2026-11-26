@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyAdminSnapshotMutation, summarizeAdminPayload } from "../src/admin-snapshots.js";
-import { profileSettingGroups } from "../src/profile-settings-catalog.js";
+import { profileSettingGroups, normalizeAppSettings } from "../src/profile-settings-catalog.js";
 import { catalogIdFor, mdblistListInfo, loadSeed, loadStandards, validateFranchise, validateOverrides } from "../src/catalog-config.js";
 
 // Demo state of the central catalog configuration (not persisted).
@@ -20,6 +20,7 @@ let overridesSaved = {
   hidden: ["just_added"],
   newRows: [{ id: "top-horror", title: "Top Horror", url: "https://mdblist.com/lists/demo/top-horror", mediaType: "movie", after: "trending_movies" }],
 };
+let demoAppDefaults = { settings: { autoPlayNext: false, subtitleSize: "Large" }, updatedAt: "2026-11-26T12:00:00.000Z" };
 let demoGaps = [
   { id: "demo-gap-1", email: "nie.geraet@example.test", createdAt: "2026-11-06T07:12:00Z", lastDeviceSeenAt: null, snapshotUpdatedAt: "2026-11-15T12:55:00Z" },
   { id: "demo-gap-2", email: "auch.keins@example.test", createdAt: "2026-11-06T07:32:00Z", lastDeviceSeenAt: null, snapshotUpdatedAt: "2026-11-15T12:55:00Z" },
@@ -494,9 +495,32 @@ const server = createServer(async (request, reply) => {
       demoGaps = demoGaps.filter((gap) => url.pathname !== `/admin-api/accounts/${gap.id}`);
       return json(reply, 200, { accepted: true });
     }
+    if (request.method === "PUT" && url.pathname === "/admin-api/global/app-defaults") {
+      try {
+        const body = await readBody(request);
+        demoAppDefaults = { settings: normalizeAppSettings(body.settings ?? {}, { allowEmpty: true }), updatedAt: new Date().toISOString() };
+        return json(reply, 200, { appDefaults: demoAppDefaults });
+      } catch (error) {
+        return json(reply, 400, { error: error.message });
+      }
+    }
+    if (request.method === "POST" && url.pathname === "/admin-api/global/preview") {
+      try {
+        const body = await readBody(request);
+        normalizeAppSettings(body.data?.settings);
+        return json(reply, 200, { preview: true, accepted: false, state: "demo", total: 128, configurable: 116, changed: 116, unchanged: 0, skipped: 12 });
+      } catch (error) {
+        return json(reply, 400, { error: error.message });
+      }
+    }
+    if (request.method === "PATCH" && url.pathname === "/admin-api/global/snapshot") {
+      return json(reply, 200, { preview: false, accepted: true, state: "demo", total: 128, configurable: 116, changed: 116, unchanged: 0, skipped: 12 });
+    }
     if (request.method === "GET" && url.pathname === "/admin-api/global") {
       const gaps = demoGaps;
       return json(reply, 200, {
+        settingsCatalog: profileSettingGroups,
+        appDefaults: demoAppDefaults,
         total: 128,
         configurable: 116,
         skipped: 12,

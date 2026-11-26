@@ -4,6 +4,11 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.070] - 2026-11-26
+
+- Backend, Admin-Panel: Neuer Tab „App-Einstellungen“ in Remote Config mit denselben Einstellungen wie im Account-Tab „Einstellungen“. Gesetzte Werte lassen sich als Default für neue Accounts speichern (der erste Cloud-Abgleich eines neuen Accounts übernimmt sie; was das Gerät selbst geändert hat, bleibt) und per Vorschau und Bestätigung bei allen bestehenden Accounts und Profilen setzen (Audit-Eintrag pro Account). Dafür sind keine App-Updates nötig; die Geräte übernehmen die Werte über die Feld-Zeitstempel beim nächsten Abgleich. Nicht geprüft: auf einem Gerät mit einem neu angelegten Account.
+- Backend, Admin-Panel: Die Einstellungen (pro Account und in Remote Config) enthalten jetzt auch die Live-TV-Playlist-Einstellungen: Senderreihenfolge, „Nur IPTV-Provider-Quellen“, „IPTV-VOD-Streams“ und Spezialkategorien. Wie in der App lassen sich die beiden IPTV-Schalter nur bei Profilen mit aktivem Streaming-Add-on ausschalten; ohne Add-on sind sie im Account gesperrt und werden bei globalen Änderungen und Defaults für neue Accounts übersprungen. Außerdem mehr Abstand unter den Buttons im Tab „App-Einstellungen“.
+
 ## [Backend 1.0.069] - 2026-11-26
 
 - Backend, Admin-Panel: Auswahlfelder sind jetzt klickbare Karten statt Dropdowns: Profil, Aktion und Add-on/Playlist beim Entfernen im Account sowie die Aktion und der Bereich (Franchises, Streamingdienste, Jahrzehnte, Genres) in Remote Config. Das Account-Formular ist in „Profil auswählen“ und „Aktion auswählen“ getrennt, die Schritte werden fortlaufend nummeriert. Die Karten der Playlists und Add-ons haben gleiche Größe, die Buttons stehen unten.

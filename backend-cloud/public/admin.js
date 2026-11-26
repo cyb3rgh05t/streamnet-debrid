@@ -552,7 +552,9 @@ function formatAuditOperation(operation) {
     catalog_franchise_save: "Franchise gespeichert",
     catalog_franchise_reset: "Franchise auf eingebaute Listen zurückgesetzt",
     catalog_franchise_delete: "Franchise gelöscht",
-    catalog_overrides_save: "Standard-Listen gespeichert",
+    catalog_overrides_save: "Default-Listen gespeichert",
+    set_app_settings: "App-Einstellungen gesetzt",
+    app_defaults_save: "App-Einstellungen: Default für neue Accounts gespeichert",
   };
   const global = typeof operation === "string" && operation.startsWith("global_");
   const key = global ? operation.slice(7) : operation;
@@ -1551,12 +1553,31 @@ function settingValueLabel(definition, value) {
   return definition.options?.[settingOptionIndex(definition, value)]?.label ?? String(value);
 }
 
+// Mirrors the app's isEnabledVodStreamingAddon: the IPTV-only options only change with a streaming add-on.
+function profileHasVodAddon(payload, profileId) {
+  const list = Array.isArray(payload?.addonsByProfile?.[profileId])
+    ? payload.addonsByProfile[profileId]
+    : Array.isArray(payload?.addons) ? payload.addons : [];
+  return list.some((addon) => {
+    if (!addon || addon.isInstalled === false || addon.isEnabled === false) return false;
+    if (addon.type === "SUBTITLE" || addon.type === "METADATA") return false;
+    const resources = Array.isArray(addon.manifest?.resources) ? addon.manifest.resources : [];
+    return resources.some((resource) => {
+      const name = String(resource?.name ?? "").toLowerCase();
+      if (name !== "stream" && name !== "streams") return false;
+      const types = Array.isArray(resource.types) ? resource.types : [];
+      return !types.length || types.some((type) => ["movie", "series", "anime"].includes(String(type).toLowerCase()));
+    });
+  });
+}
+
 async function saveProfileSetting(definition, value, control, row) {
   const snapshot = state.selectedAccount.snapshot;
   const accountWide = definition.scope === "account";
   const profileId = state.settingsProfileId;
   const accountId = state.selectedAccount.account.id;
-  const settings = accountWide ? snapshot.payload : ((snapshot.payload.profileSettingsById ??= {})[profileId] ??= {});
+  const rootKey = definition.root || "profileSettingsById";
+  const settings = accountWide ? snapshot.payload : ((snapshot.payload[rootKey] ??= {})[profileId] ??= {});
   const previous = Object.hasOwn(settings, definition.field) ? settings[definition.field] : definition.default;
   control.disabled = true;
   try {
@@ -1568,7 +1589,7 @@ async function saveProfileSetting(definition, value, control, row) {
           : {
             operation: "set_profile_field",
             profileId,
-            rootKey: "profileSettingsById",
+            rootKey,
             field: definition.field,
             data: value,
             expectedRevision: snapshot.revision,
@@ -1596,19 +1617,27 @@ async function saveProfileSetting(definition, value, control, row) {
   }
 }
 
-function settingsCard(group, values) {
+// `onChange` and `onReset` let a page other than an account's own settings reuse the cards: the central
+// defaults edit a draft instead of saving each change straight into one snapshot. `isLocked` returns a reason
+// when a setting cannot be changed (shown instead of the hint, the switch stays on like in the app).
+function settingsCard(group, values, { onChange = saveProfileSetting, onReset = null, isLocked = () => null } = {}) {
   const card = rcElement("div", null, "rc-inv-card settings-group");
   card.append(rcElement("strong", group.title, "settings-group-title"));
   for (const base of group.settings) {
-    const definition = { ...base, scope: group.scope || "profile" };
+    const definition = { ...base, scope: group.scope || "profile", root: group.root || "profileSettingsById" };
+    const lockedReason = isLocked(definition);
     const stored = Object.hasOwn(values, definition.field);
-    const current = stored ? values[definition.field] : definition.default;
-    const row = rcElement("div", null, `setting-row${stored ? "" : " is-default"}`);
+    const current = lockedReason ? true : stored ? values[definition.field] : definition.default;
+    const row = rcElement("div", null, `setting-row${stored ? "" : " is-default"}${lockedReason ? " is-locked" : ""}`);
     const text = rcElement("div", null, "setting-text");
     const label = rcElement("strong", definition.label);
     label.append(rcElement("span", "Default", "default-badge setting-default-tag"));
+    if (onReset) label.append(rcElement("span", "Gesetzt", "changed-badge setting-set-tag"));
     text.append(label);
-    if (definition.hint) text.append(rcElement("small", definition.hint));
+    const hint = lockedReason || (onReset && definition.needsVodAddon
+      ? `${definition.hint} Wird nur bei Profilen mit aktivem Streaming-Add-on ausgeschaltet; ohne Add-on bleibt es an.`
+      : definition.hint);
+    if (hint) text.append(rcElement("small", hint));
     let control;
     if (definition.type === "boolean") {
       control = document.createElement("input");
@@ -1616,7 +1645,7 @@ function settingsCard(group, values) {
       control.className = "rc-switch";
       control.checked = Boolean(current);
       control.setAttribute("aria-label", definition.label);
-      control.addEventListener("change", () => saveProfileSetting(definition, control.checked, control, row));
+      control.addEventListener("change", () => onChange(definition, control.checked, control, row));
     } else {
       control = document.createElement("select");
       control.className = "setting-select";
@@ -1629,9 +1658,17 @@ function settingsCard(group, values) {
       });
       control.value = String(settingOptionIndex(definition, current));
       control.addEventListener("change", () =>
-        saveProfileSetting(definition, definition.options[Number(control.value)].value, control, row));
+        onChange(definition, definition.options[Number(control.value)].value, control, row));
     }
-    row.append(text, control);
+    row.append(text);
+    if (onReset) {
+      const reset = rcElement("button", "Zurücksetzen", "text-button setting-reset");
+      reset.type = "button";
+      reset.addEventListener("click", () => onReset(definition));
+      row.append(reset);
+    }
+    row.append(control);
+    if (lockedReason) control.disabled = true;
     if (control.tagName === "SELECT") enhanceSelect(control);
     card.append(row);
   }
@@ -1686,7 +1723,15 @@ function renderAccountSettings() {
     nodes.push(rcElement("p", "Dieser Account hat kein Profil in der Cloud.", "rc-hint"));
   } else {
     const values = snapshot.payload?.profileSettingsById?.[state.settingsProfileId] || {};
-    nodes.push(...profileGroups.map((group) => settingsCard(group, values)));
+    const iptvValues = snapshot.payload?.iptvByProfile?.[state.settingsProfileId] || {};
+    const hasVodAddon = profileHasVodAddon(snapshot.payload, state.settingsProfileId);
+    const options = {
+      isLocked: (definition) => definition.needsVodAddon && !hasVodAddon
+        ? "Installiere oder aktiviere ein Streaming-Add-on, um diese Einstellung zu ändern."
+        : null,
+    };
+    nodes.push(...profileGroups.map((group) =>
+      settingsCard(group, group.root === "iptvByProfile" ? iptvValues : values, options)));
   }
   groupsBox.replaceChildren(...nodes);
 }
@@ -2289,6 +2334,122 @@ async function loadGlobal() {
     `${state.global.skipped} ohne Snapshot/Profile (werden übersprungen)`;
   updateGlobalFields();
   renderRcInventory();
+  rcApp.draft = { ...(state.global.appDefaults?.settings ?? {}) };
+  renderRcAppSettings();
+}
+
+// App settings for all accounts: the draft is what the admin picked; saving makes it the default of accounts
+// created later, applying writes it into every existing account.
+const rcApp = { draft: {} };
+
+const rcAppSaved = () => state.global?.appDefaults?.settings ?? {};
+
+function renderRcAppSettings() {
+  const groups = state.global?.settingsCatalog;
+  const box = byId("rc-app-groups");
+  if (!groups?.length) {
+    box.replaceChildren(rcElement("p", "Die Einstellungsliste fehlt in der Server-Antwort. Das Backend ist vermutlich älter als diese Oberfläche und muss aktualisiert werden.", "rc-hint"));
+    return;
+  }
+  const options = {
+    onChange: (definition, value, _control, row) => {
+      rcApp.draft[definition.field] = value;
+      row.classList.remove("is-default");
+      refreshRcAppSummary();
+    },
+    onReset: (definition) => {
+      delete rcApp.draft[definition.field];
+      renderRcAppSettings();
+    },
+  };
+  const sectionHead = (title, hint) => {
+    const head = rcElement("div", null, "settings-section-head");
+    head.append(rcElement("h3", title, "rc-heading"), rcElement("p", hint, "rc-hint"));
+    return head;
+  };
+  box.replaceChildren(
+    sectionHead("Für den ganzen Account", "Netzwerk- und Gerätewerte, die nicht zu einem einzelnen Profil gehören."),
+    ...groups.filter((group) => group.scope === "account").map((group) => settingsCard(group, rcApp.draft, options)),
+    sectionHead("Pro Profil", "Gilt für jedes Profil eines Accounts."),
+    ...groups.filter((group) => group.scope !== "account").map((group) => settingsCard(group, rcApp.draft, options)),
+  );
+  refreshRcAppSummary();
+}
+
+function refreshRcAppSummary() {
+  const set = Object.keys(rcApp.draft).length;
+  const dirty = JSON.stringify(Object.entries(rcApp.draft).sort()) !== JSON.stringify(Object.entries(rcAppSaved()).sort());
+  byId("rc-app-summary").textContent = set
+    ? `${set} Einstellung${set === 1 ? "" : "en"} gesetzt${dirty ? " – noch nicht gespeichert" : ""}. Nicht gesetzte Einstellungen behalten den Default der App.`
+    : "Keine Einstellung gesetzt. Alle Einstellungen behalten den Default der App.";
+  byId("rc-app-apply").disabled = !set;
+  byId("rc-app-reset").disabled = !set;
+}
+
+async function saveRcAppDefaults() {
+  const button = byId("rc-app-save");
+  const message = byId("rc-app-message");
+  setButtonBusy(button, true, "Wird gespeichert…");
+  try {
+    const result = await api("/admin-api/global/app-defaults", {
+      method: "PUT",
+      body: JSON.stringify({ settings: rcApp.draft, reason: byId("rc-app-reason").value }),
+    });
+    state.global.appDefaults = result.appDefaults;
+    refreshRcAppSummary();
+    setMessage(message, "Als Default für neue Accounts gespeichert. Gilt ab dem ersten Cloud-Abgleich eines neuen Accounts.", "success");
+    showToast("App-Einstellungen gespeichert.");
+  } catch (error) {
+    setMessage(message, error.message, "error");
+    showToast(error.message, true);
+  } finally {
+    setButtonBusy(button, false);
+  }
+}
+
+async function applyRcAppSettings() {
+  const button = byId("rc-app-apply");
+  const message = byId("rc-app-message");
+  setButtonBusy(button, true, "Vorschau wird geladen…");
+  try {
+    const request = {
+      operation: "set_app_settings",
+      data: { settings: rcApp.draft },
+      reason: byId("rc-app-reason").value,
+    };
+    const preview = await api("/admin-api/global/preview", { method: "POST", body: JSON.stringify(request) });
+    const counts = (result) =>
+      `${result.changed} Account(s) geändert, ${result.unchanged} unverändert, ${result.skipped} ohne Snapshot/Profile übersprungen.`;
+    if (!preview.changed) {
+      setMessage(message, `Keine Änderungen erforderlich. ${counts(preview)}`, "info");
+      return;
+    }
+    const fields = Object.keys(rcApp.draft).length;
+    const confirmed = await confirmAction({
+      title: "Globale Änderung bestätigen",
+      eyebrow: "ALLE ACCOUNTS",
+      message: `${fields} App-Einstellung${fields === 1 ? "" : "en"} bei allen Profilen setzen. ` +
+        `${preview.changed} von ${preview.total} Accounts werden geändert; ${preview.unchanged} bleiben unverändert, ` +
+        `${preview.skipped} werden übersprungen. Eigene Werte der Nutzer für diese Einstellungen werden überschrieben.`,
+      confirmLabel: "Global anwenden",
+    });
+    if (!confirmed) {
+      setMessage(message, "Globale Änderung abgebrochen.", "info");
+      return;
+    }
+    const result = await api("/admin-api/global/snapshot", {
+      method: "PATCH",
+      body: JSON.stringify({ ...request, expectedState: preview.state, confirmation: "ALLE ACCOUNTS" }),
+    });
+    setMessage(message, `Gespeichert und pro Account protokolliert. ${counts(result)}`, "success");
+    showToast("Globale Änderung gespeichert.");
+  } catch (error) {
+    setMessage(message, error.message, "error");
+    showToast(error.message, true);
+  } finally {
+    setButtonBusy(button, false);
+    refreshRcAppSummary();
+  }
 }
 const rcTabs = ["movie", "series", "timeline"];
 const rcNewKey = "__new__";
@@ -3886,6 +4047,12 @@ byId("global-target").addEventListener("change", () => {
   }
 });
 byId("global-form").addEventListener("submit", submitGlobalMutation);
+byId("rc-app-save").addEventListener("click", saveRcAppDefaults);
+byId("rc-app-apply").addEventListener("click", applyRcAppSettings);
+byId("rc-app-reset").addEventListener("click", () => {
+  rcApp.draft = {};
+  renderRcAppSettings();
+});
 for (const [id, load] of [
   ["global-refresh", loadGlobal],
   ["dashboard-refresh", loadDashboard],

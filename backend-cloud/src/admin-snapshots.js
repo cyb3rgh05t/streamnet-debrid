@@ -5,7 +5,14 @@ import {
   syncAdminStreamNetHostOverrides,
   xtreamUrls,
 } from "./streamnet-host-overrides.js";
-import { isAccountSetting, validateProfileSettingValue } from "./profile-settings-catalog.js";
+import {
+  canWriteSettingForProfile,
+  isAccountSetting,
+  normalizeAppSettings,
+  profileSettingDefinition,
+  profileSettingRoot,
+  validateProfileSettingValue,
+} from "./profile-settings-catalog.js";
 
 const blockedPropertyNames = new Set(["__proto__", "constructor", "prototype"]);
 const sensitivePropertyPattern =
@@ -254,6 +261,37 @@ function stampFieldUpdatedAt(payload, rootKey, profileId, field, now) {
 
 function jsonEqual(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+/**
+ * Writes app settings into a snapshot the way a device would: the value plus a field timestamp
+ * ("g:<field>" account-wide, "p:<profileId>:<field>" per profile) that the devices merge on their next pull.
+ * With `skipStamped` a field a device has already changed itself is left alone (defaults for new accounts).
+ * Returns whether anything changed.
+ */
+export function applyAppSettingValues(payload, settings, now, { skipStamped = false } = {}) {
+  if (!isPlainObject(payload.fieldUpdatedAt)) payload.fieldUpdatedAt = {};
+  const stamps = payload.fieldUpdatedAt;
+  let changed = false;
+  const write = (target, field, value, stampKey) => {
+    if (skipStamped && Number(stamps[stampKey] || 0) > 0) return;
+    if (Object.hasOwn(target, field) && jsonEqual(target[field], value)) return;
+    target[field] = value;
+    stamps[stampKey] = now;
+    changed = true;
+  };
+  for (const [field, value] of Object.entries(settings)) {
+    if (isAccountSetting(field)) {
+      write(payload, field, value, `g:${field}`);
+      continue;
+    }
+    for (const profileId of profileIds(payload)) {
+      if (!canWriteSettingForProfile(payload, profileId, field, value)) continue;
+      const root = profileSettingRoot(field);
+      write(objectAt(payload, root, profileId), field, value, `${root === "iptvByProfile" ? "i" : "p"}:${profileId}:${field}`);
+    }
+  }
+  return changed;
 }
 
 function stampEditedProfileFields(current, edited, rootKey, prefix, now) {
@@ -687,7 +725,14 @@ export function applyAdminSnapshotMutation(
     }
     const clonedValue = cloneJson(data, "Field data");
     assertSafeKeys(clonedValue);
-    if (rootKey === "profileSettingsById") validateProfileSettingValue(field, clonedValue);
+    const definition = profileSettingDefinition(field);
+    if (definition && definition.root !== rootKey) {
+      throw new Error("Profile field is not editable through this operation");
+    }
+    if (definition) validateProfileSettingValue(field, clonedValue);
+    if (!canWriteSettingForProfile(payload, profileId, field, clonedValue)) {
+      throw new Error("Profile has no streaming add-on for this setting");
+    }
     objectAt(payload, rootKey, profileId)[field] = clonedValue;
     stampFieldUpdatedAt(payload, rootKey, profileId, field, now);
   } else if (operation === "set_account_setting") {
@@ -717,15 +762,21 @@ export function prepareAdminGlobalMutation(request) {
     "change_xtream_host", "clear_streamnet_host_override",
     "add_catalog", "rename_catalog", "set_catalog_enabled", "delete_catalog",
     "clear_catalog_source", "remove_obsolete_catalogs",
+    "set_app_settings",
   ]);
   if (!allowed.has(operation)) throw new Error("Unsupported operation");
   const targetId = operation === "clear_streamnet_host_override"
     ? "streamnet_tv"
+    : operation === "set_app_settings"
+    ? null
     : /^(edit|delete|rename|set)_/.test(operation) || operation === "clear_catalog_source" ||
         operation === "change_xtream_host"
     ? cleanIdentifier(request.targetId, operation.endsWith("addon") ? "Addon id" : operation.includes("catalog") ? "Catalog id" : "Playlist id")
     : null;
   let data = null;
+  if (operation === "set_app_settings") {
+    data = { settings: normalizeAppSettings(request.data?.settings) };
+  }
   if (operation === "rename_catalog") {
     data = { title: cleanIdentifier(request.data?.title, "Catalog title") };
   }
@@ -1120,6 +1171,11 @@ export function applyAdminGlobalMutation(payloadValue, mutation, now = Date.now(
   const payload = cloneJson(payloadValue, "Snapshot payload", adminSnapshotMaxBytes);
   for (const id of profileIds(payload)) cleanIdentifier(id, "profileId");
   const { operation, targetId, data } = mutation;
+  if (operation === "set_app_settings") {
+    if (!applyAppSettingValues(payload, data.settings, now)) return null;
+    payload.updatedAt = now;
+    return payload;
+  }
   if (operation.includes("catalog")) {
     if (!applyGlobalCatalogMutation(payload, mutation, now)) return null;
   } else if (operation.endsWith("addon") || operation === "clear_addons") {

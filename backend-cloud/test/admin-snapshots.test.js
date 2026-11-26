@@ -4,6 +4,7 @@ import {
   applyAdminSnapshotMutation,
   adminGlobalInventory,
   applyAdminGlobalMutation,
+  applyAppSettingValues,
   prepareAdminGlobalMutation,
   hydrateAdminStremioAddon,
   redactAdminPayload,
@@ -61,6 +62,69 @@ test("global inventory deduplicates playlists and includes top-level addons with
     playlists: [{ id: "tv", name: "TV" }],
     catalogs: [{ id: "movies", name: "movies", sourceType: "" }],
   });
+});
+
+test("a global app-setting change writes values and field timestamps for every profile and only once", () => {
+  const mutation = prepareAdminGlobalMutation({
+    operation: "set_app_settings",
+    data: { settings: { autoPlayNext: false, subtitleSize: "Large", dnsProvider: "cloudflare" } },
+  });
+  assert.equal(mutation.targetId, null);
+  const result = applyAdminGlobalMutation(snapshot(), mutation, 5000);
+  assert.equal(result.dnsProvider, "cloudflare");
+  assert.equal(result.fieldUpdatedAt["g:dnsProvider"], 5000);
+  for (const id of ["living-room", "kids"]) {
+    assert.equal(result.profileSettingsById[id].autoPlayNext, false);
+    assert.equal(result.profileSettingsById[id].subtitleSize, "Large");
+    assert.equal(result.fieldUpdatedAt[`p:${id}:autoPlayNext`], 5000);
+  }
+  assert.equal(applyAdminGlobalMutation(result, mutation, 6000), null);
+});
+
+test("app-setting defaults for a new account leave settings the device changed itself", () => {
+  const incoming = snapshot();
+  incoming.profileSettingsById = { kids: { autoPlayNext: true } };
+  incoming.fieldUpdatedAt = { "p:kids:autoPlayNext": 1000 };
+  applyAppSettingValues(incoming, { autoPlayNext: false, subtitleSize: "Large" }, 5000, { skipStamped: true });
+  assert.equal(incoming.profileSettingsById.kids.autoPlayNext, true);
+  assert.equal(incoming.profileSettingsById["living-room"].autoPlayNext, false);
+  assert.equal(incoming.profileSettingsById.kids.subtitleSize, "Large");
+  assert.equal(incoming.fieldUpdatedAt["p:kids:autoPlayNext"], 1000);
+  assert.equal(incoming.fieldUpdatedAt["p:living-room:autoPlayNext"], 5000);
+});
+
+test("Live TV settings live in the IPTV state, and switching off IPTV-only needs a streaming add-on", () => {
+  const vodAddon = { id: "streams", isInstalled: true, isEnabled: true, type: "CUSTOM", manifest: { resources: [{ name: "stream", types: ["movie"] }] } };
+  const subtitleOnly = { id: "subs", isEnabled: true, type: "SUBTITLE", manifest: { resources: [{ name: "subtitles" }] } };
+  const value = snapshot();
+  value.addonsByProfile = { "living-room": [vodAddon], kids: [subtitleOnly] };
+  const mutation = prepareAdminGlobalMutation({
+    operation: "set_app_settings",
+    data: { settings: { sortOrder: "name", iptvOnlyMode: false, vodSearchEnabled: false } },
+  });
+  const result = applyAdminGlobalMutation(value, mutation, 5000);
+  assert.equal(result.iptvByProfile["living-room"].sortOrder, "name");
+  assert.equal(result.iptvByProfile["living-room"].iptvOnlyMode, false);
+  assert.equal(result.fieldUpdatedAt["i:living-room:iptvOnlyMode"], 5000);
+  assert.equal(result.iptvByProfile.kids.sortOrder, "name");
+  assert.equal(Object.hasOwn(result.iptvByProfile.kids, "iptvOnlyMode"), false);
+  assert.equal(Object.hasOwn(result.iptvByProfile.kids, "vodSearchEnabled"), false);
+  assert.equal(result.profileSettingsById, undefined);
+
+  const request = (profileId, data) => ({ operation: "set_profile_field", profileId, rootKey: "iptvByProfile", field: "iptvOnlyMode", data });
+  assert.equal(applyAdminSnapshotMutation(value, request("living-room", false), 9000).iptvByProfile["living-room"].iptvOnlyMode, false);
+  assert.throws(() => applyAdminSnapshotMutation(value, request("kids", false), 9000), /streaming add-on/);
+  assert.equal(applyAdminSnapshotMutation(value, request("kids", true), 9000).iptvByProfile.kids.iptvOnlyMode, true);
+  assert.throws(
+    () => applyAdminSnapshotMutation(value, { ...request("kids", true), rootKey: "profileSettingsById" }, 9000),
+    /not editable/,
+  );
+});
+
+test("a global app-setting change rejects unknown fields and values outside a setting's choices", () => {
+  for (const settings of [{ notASetting: true }, { subtitleSize: "Huge" }, { autoPlayNext: "yes" }, {}]) {
+    assert.throws(() => prepareAdminGlobalMutation({ operation: "set_app_settings", data: { settings } }));
+  }
 });
 
 test("the web OpenSubtitles id counts as the app's opensubtitles add-on", () => {

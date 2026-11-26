@@ -9,7 +9,8 @@ import { verifyScryptPassword } from "./passwords.js";
 import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
 import { deleteAccountData } from "./account-deletion.js";
 import { registerCatalogConfigRoutes } from "./catalog-config.js";
-import { profileSettingGroups } from "./profile-settings-catalog.js";
+import { profileSettingGroups, normalizeAppSettings } from "./profile-settings-catalog.js";
+import { appSettingDefaultsId, readAppSettingDefaults } from "./app-setting-defaults.js";
 import {
   applyAdminSnapshotMutation,
   adminGlobalInventory,
@@ -394,7 +395,52 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
   app.get("/admin-api/global", async (request, reply) => {
     reply.header("Cache-Control", "no-store");
     await authenticatedAdmin(request, pool, jwtKey);
-    return globalSummary((await pool.query(globalAccountsQuery)).rows);
+    return {
+      ...globalSummary((await pool.query(globalAccountsQuery)).rows),
+      settingsCatalog: profileSettingGroups,
+      appDefaults: await readAppSettingDefaults(pool),
+    };
+  });
+
+  // Defaults for accounts created later: their first snapshot starts with these values (see /account-sync-push).
+  app.put("/admin-api/global/app-defaults", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    const admin = await authenticatedAdmin(request, pool, jwtKey);
+    let settings;
+    try {
+      settings = normalizeAppSettings(request.body?.settings ?? {}, { allowEmpty: true });
+    } catch (error) {
+      request.backendFailureReason = mutationFailureReason(error);
+      return reply.code(400).send({ error: error.message });
+    }
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      await client.query(
+        `insert into catalog_config (id, payload, revision, updated_at) values ($1, $2::jsonb, 1, now())
+         on conflict (id) do update
+           set payload = excluded.payload, revision = catalog_config.revision + 1, updated_at = now()`,
+        [appSettingDefaultsId, JSON.stringify({ settings })],
+      );
+      await client.query(
+        `insert into admin_audit_logs (
+           id, admin_id, account_id, operation, profile_id, reason,
+           details, revision_before, revision_after, request_ip, user_agent
+         ) values ($1, $2, null, 'app_defaults_save', null, $3, $4::jsonb, 0, 0, $5, $6)`,
+        [
+          crypto.randomUUID(), admin.id, optionalAuditReason(request.body?.reason),
+          JSON.stringify({ fields: Object.keys(settings) }), request.ip || null,
+          String(request.headers["user-agent"] || "").slice(0, 500) || null,
+        ],
+      );
+      await client.query("commit");
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
+    return { appDefaults: await readAppSettingDefaults(pool) };
   });
 
   app.get("/admin-api/global/mdblist-titles", async (request, reply) => {
@@ -584,6 +630,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
               batchId,
               targetId: mutation.targetId,
               itemId: mutation.data?.id || null,
+              ...(mutation.data?.settings ? { settings: mutation.data.settings } : {}),
             }),
             revision,
             revision + 1,
