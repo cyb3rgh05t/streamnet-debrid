@@ -91,6 +91,12 @@
 # Keep enum field names for Gson (used in Trakt outbox persistence)
 -keepclassmembers enum com.arflix.tv.data.repository.TraktOutboxAction { *; }
 
+# The update check parses the GitHub release with Gson. R8 merged GitHubReleaseDto into an unrelated abstract
+# class and dropped GitHubAssetDto, so the update failed with "Abstract classes can't be instantiated".
+# Keeping the classes (not only their fields) stops the merging and renaming.
+-keep class com.arflix.tv.updater.GitHubReleaseDto { *; }
+-keep class com.arflix.tv.updater.GitHubAssetDto { *; }
+
 # ============================================
 # ExoPlayer / Media3
 # ============================================

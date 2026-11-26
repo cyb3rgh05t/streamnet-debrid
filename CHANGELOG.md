@@ -4,6 +4,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.031] - 2026-11-26
+
+- Android, Update: Die In-App-Aktualisierung schlug seit 2.6.029 mit „Abstract classes can't be instantiated! … com.arflix.tv.updater.h“ fehl. R8 hatte die GitHub-Release-Klassen des Update-Checks mit anderen Klassen zusammengelegt bzw. entfernt, sodass Gson die Antwort nicht mehr lesen konnte. Die beiden Klassen sind jetzt per Keep-Regel geschützt; im R8-Mapping von `sideloadStaging` bleiben sie mit unverändertem Namen erhalten. Betroffen sind 2.6.029 und 2.6.030: Diese Versionen können sich nicht selbst aktualisieren und müssen 2.6.031 einmal manuell installieren. Nicht geprüft: Update auf einem Gerät.
+
 ## [Backend 1.0.070] - 2026-11-26
 
 - Backend, Admin-Panel: Neuer Tab „App-Einstellungen“ in Remote Config mit denselben Einstellungen wie im Account-Tab „Einstellungen“. Gesetzte Werte lassen sich als Default für neue Accounts speichern (der erste Cloud-Abgleich eines neuen Accounts übernimmt sie; was das Gerät selbst geändert hat, bleibt) und per Vorschau und Bestätigung bei allen bestehenden Accounts und Profilen setzen (Audit-Eintrag pro Account). Dafür sind keine App-Updates nötig; die Geräte übernehmen die Werte über die Feld-Zeitstempel beim nächsten Abgleich. Nicht geprüft: auf einem Gerät mit einem neu angelegten Account.
