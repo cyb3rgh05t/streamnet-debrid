@@ -1,0 +1,88 @@
+name: Cleanup Old Tags
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep-count:
+        description: Number of newest tags to keep
+        required: true
+        default: "10"
+      pattern:
+        description: Only consider tags matching this regex (empty = all tags)
+        required: false
+        default: ""
+      skip-tags-with-release:
+        description: Never delete tags that still have a GitHub release
+        type: boolean
+        default: true
+      dry-run:
+        description: Only simulate, delete nothing
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cleanup-old-tags
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Delete old tags
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      KEEP_COUNT: ${{ inputs.keep-count }}
+      PATTERN: ${{ inputs.pattern }}
+      SKIP_WITH_RELEASE: ${{ inputs.skip-tags-with-release }}
+      DRY_RUN: ${{ inputs.dry-run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Delete old tags
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! [[ "$KEEP_COUNT" =~ ^[1-9][0-9]*$ ]]; then
+            echo "keep-count must be a positive integer" >&2
+            exit 1
+          fi
+
+          tags="$(git for-each-ref --sort=-creatordate --format='%(refname:short)' refs/tags)"
+          if [[ -n "$PATTERN" ]]; then
+            tags="$(grep -E -- "$PATTERN" <<< "$tags" || true)"
+          fi
+
+          total="$(grep -c . <<< "$tags" || true)"
+          echo "$total matching tags found, keeping the newest $KEEP_COUNT"
+
+          old_tags="$(tail -n +"$((KEEP_COUNT + 1))" <<< "$tags")"
+          if [[ -z "$old_tags" ]]; then
+            echo "Nothing to delete."
+            exit 0
+          fi
+
+          deleted=0
+          while IFS= read -r tag; do
+            [[ -z "$tag" ]] && continue
+
+            if [[ "$SKIP_WITH_RELEASE" == "true" ]] && gh release view "$tag" >/dev/null 2>&1; then
+              echo "Skipping $tag (has a release)"
+              continue
+            fi
+
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[dry-run] would delete tag $tag"
+            else
+              git push origin --delete "refs/tags/$tag"
+              echo "Deleted tag $tag"
+            fi
+            deleted=$((deleted + 1))
+          done <<< "$old_tags"
+
+          echo "Affected tags: $deleted (dry-run: $DRY_RUN)"
