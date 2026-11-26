@@ -6,8 +6,8 @@
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <title>StreamNet Admin</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin/admin.css?v=1.0.067" />
-    <script src="/admin/admin.js?v=1.0.067" defer></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=1.0.068" />
+    <script src="/admin/admin.js?v=1.0.068" defer></script>
   </head>
   <body>
     <div id="page-loading"></div>
@@ -904,18 +904,20 @@
                       Einstellungen bleiben erhalten. Gespeicherte URLs werden
                       aus Sicherheitsgründen nicht angezeigt.
                     </div>
-                    <label
-                      >Playlist-Typ<select id="global-playlist-type">
-                        <option value="m3u">M3U / get.php-Link</option>
-                        <option value="xtream">Xtream Codes</option>
-                        <option value="streamnet_tv">
-                          StreamNet TV (System-Playlist)
-                        </option>
-                      </select></label
-                    >
-                    <label
-                      >Name<input id="global-playlist-name" maxlength="200"
-                    /></label>
+                    <div class="field-pair">
+                      <label
+                        >Playlist-Typ<select id="global-playlist-type">
+                          <option value="m3u">M3U / get.php-Link</option>
+                          <option value="xtream">Xtream Codes</option>
+                          <option value="streamnet_tv">
+                            StreamNet TV (System-Playlist)
+                          </option>
+                        </select></label
+                      >
+                      <label
+                        >Name<input id="global-playlist-name" maxlength="200"
+                      /></label>
+                    </div>
                     <div id="global-m3u-fields" class="op-fields">
                       <label
                         >M3U-URL<input
@@ -944,19 +946,21 @@
                           type="url"
                           placeholder="https://server.example:8080"
                       /></label>
-                      <label
-                        >Benutzername<input
-                          id="global-xtream-user"
-                          autocomplete="off"
-                          maxlength="500"
-                      /></label>
-                      <label
-                        >Passwort<input
-                          id="global-xtream-password"
-                          type="password"
-                          autocomplete="new-password"
-                          maxlength="500"
-                      /></label>
+                      <div class="field-pair">
+                        <label
+                          >Benutzername<input
+                            id="global-xtream-user"
+                            autocomplete="off"
+                            maxlength="500"
+                        /></label>
+                        <label
+                          >Passwort<input
+                            id="global-xtream-password"
+                            type="password"
+                            autocomplete="new-password"
+                            maxlength="500"
+                        /></label>
+                      </div>
                     </div>
                     <div class="checkbox-grid">
                       <label class="checkbox-field"

@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.068] - 2026-11-26
+
+- CI, Aufräum-Workflow: „Cleanup Old Releases“ nutzt kein `Nats-ji/delete-old-releases` mehr. Die Action konnte Tags mit führenden Nullen (`2.6.029`) nicht als Version lesen, behielt nur wenige alte Tags und hätte bei abgeschaltetem Dry-Run die neuesten Releases gelöscht. Ein eigenes Skript vergleicht die Versionen jetzt numerisch, behält die neuesten `keep-count` Releases, ignoriert Drafts, Prereleases (ohne Haken) und Tags, die nicht `x.y.z` sind, und bricht ab, falls das neueste Release gelöscht würde. Die Inputs für „ältere Minor-Versionen behalten“ sind entfernt. Mit den 196 Tags des letzten Laufs geprüft: Neueste `2.6.029`, behalten werden die fünf neuesten. Nicht geprüft: Lauf in GitHub Actions.
+- Backend, Admin-Panel: Die Konfigurationsformulare in Remote Config (Playlists, Add-ons, Home-Kataloge) und in den einzelnen Accounts sind übersichtlicher aufgebaut. Zusammengehörige Felder stehen nebeneinander (Playlist-Typ und Name, Xtream-Benutzername und -Passwort). Der Hinweis zu „Weitere Playlists/Add-ons“ und sein Button teilen sich eine Zeile. Die Spalte „Prüfen & bestätigen“ bleibt beim Scrollen sichtbar, die Abschnitte sind durch Trennlinien klarer gegliedert und die Hinweistexte kompakter.
+- Backend, Admin-Panel mobil und auf Tablets: Die Zwei-Spalten-Ansichten (Collections, Home-Kataloge, Account-Editor) stapeln sich jetzt ab 1100 px statt ab 800 px, weil die Seitenleiste Platz braucht; dadurch laufen Felder und Buttons nicht mehr über den Bildschirmrand. Außerdem behoben: Einstellungs-Tab eines Accounts (Zeilen mit Auswahl und Schalter), abgeschnittene Kennzahlen-Kacheln, lange Konto-IDs und das Cover-Vorschaubild bei schmalen Bildschirmen; Schalter-Gruppen und Kennzahlen stapeln auf dem Handy.
+
 ## [2.6.029] - 2026-11-25
 
 - Android, Performance: Im Release-Build werden `Log.v/d/i` und `AppLogger.v/d/i` samt String-Aufbau von R8 entfernt (Warnungen und Fehler bleiben). Die Compose-Stability-Config markiert die Live-TV-Kategoriebaum-Klassen und `Bitmap` als stabil; dadurch sind `SettingsUiState` (Einstellungen) und `LiveCategoryTree`/`EnrichedChannels` (Live-TV-Seitenleiste) überspringbar. Der redundante Blur-Effekt im Player-Ladebildschirm ist entfernt (der Radial-Gradient glüht bereits weich).

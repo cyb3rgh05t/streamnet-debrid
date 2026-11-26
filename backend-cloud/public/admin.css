@@ -3114,3 +3114,143 @@ tbody tr[data-account-id]:focus .account-primary {
     grid-template-columns: 1fr;
   }
 }
+/* Config forms (Remote Config + account editor): denser desktop layout, sticky confirmation, safe mobile */
+@media (min-width: 1101px) {
+  .global-config-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  }
+}
+.global-confirm-column {
+  position: sticky;
+  top: 16px;
+}
+.field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.field-pair > label {
+  min-width: 0;
+}
+.op-fields > .checkbox-field {
+  min-height: 44px;
+}
+.global-config-card .quick-panel {
+  font-size: 12px;
+  line-height: 1.65;
+}
+.global-scope ul {
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+.rc-panel > .rc-heading,
+.rc-panel > form + .rc-heading {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.rc-panel > .rc-intro + .rc-heading,
+.rc-panel > .rc-heading:first-child {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: 0;
+}
+.rc-extra {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  justify-items: stretch;
+  gap: 12px 24px;
+}
+.rc-extra > .button {
+  justify-self: end;
+  white-space: nowrap;
+}
+.rc-inventory {
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+}
+@media (max-width: 1100px) {
+  .global-confirm-column {
+    position: static;
+  }
+  /* The sidebar takes ~250px, so these multi-column layouts need to stack well before phone width. */
+  .rc-split,
+  .rc-newrow-form,
+  .rc-newrow,
+  .rc-list-row,
+  .rc-source-row,
+  .split-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.rc-franchise-form {
+  grid-template-columns: minmax(0, 1fr);
+}
+.rc-cover-preview {
+  max-width: 100%;
+}
+.metrics.compact {
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+}
+.metric-value,
+.account-secondary,
+#account-view h2 {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .rc-extra {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rc-extra > .button {
+    justify-self: stretch;
+    width: 100%;
+  }
+  .global-confirm-column .button {
+    width: 100%;
+  }
+}
+@media (max-width: 600px) {
+  .setting-row {
+    flex-wrap: wrap;
+  }
+  .setting-text {
+    flex: 1 1 160px;
+  }
+  .setting-row .custom-select,
+  .setting-select {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  .section-heading {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .section-heading > .button {
+    width: 100%;
+  }
+  .field-pair,
+  .field-controls,
+  .checkbox-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .metrics.compact,
+  #account-view .metrics.compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .metric {
+    min-height: 0;
+    padding: 12px;
+    gap: 10px;
+  }
+  .metric-value {
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+}
+@media (max-width: 560px) {
+  .settings-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .history-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

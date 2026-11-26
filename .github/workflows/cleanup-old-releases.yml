@@ -7,19 +7,6 @@ on:
         description: Number of newest releases to keep
         required: true
         default: "5"
-      keep-old-minor-releases:
-        description: Keep the latest release of each older minor version
-        type: boolean
-        default: true
-      keep-old-minor-releases-by:
-        description: Semver level used to keep old releases
-        type: choice
-        options: [major, minor, patch]
-        default: minor
-      keep-old-minor-releases-count:
-        description: Number of old releases to keep per version level
-        required: true
-        default: "1"
       include-prerelease:
         description: Include prerelease versions
         type: boolean
@@ -45,16 +32,68 @@ jobs:
     name: Delete old releases
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
+      # Tags use zero-padded patch numbers (2.6.029), which is not valid semver, so semver-based
+      # actions treat them as unparseable. Versions are compared numerically here instead.
       - name: Delete old releases
-        uses: Nats-ji/delete-old-releases@v1
+        uses: actions/github-script@v7
+        env:
+          KEEP_COUNT: ${{ inputs.keep-count }}
+          INCLUDE_PRERELEASE: ${{ inputs.include-prerelease }}
+          REMOVE_TAGS: ${{ inputs.remove-tags }}
+          DRY_RUN: ${{ inputs.dry-run }}
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          keep-count: ${{ inputs.keep-count }}
-          keep-old-minor-releases: ${{ inputs.keep-old-minor-releases }}
-          keep-old-minor-releases-by: ${{ inputs.keep-old-minor-releases-by }}
-          keep-old-minor-releases-count: ${{ inputs.keep-old-minor-releases-count }}
-          include-prerelease: ${{ inputs.include-prerelease }}
-          remove-tags: ${{ inputs.remove-tags }}
-          dry-run: ${{ inputs.dry-run }}
+          script: |
+            const keepCount = Math.max(parseInt(process.env.KEEP_COUNT, 10) || 0, 1);
+            const includePrerelease = process.env.INCLUDE_PRERELEASE === 'true';
+            const removeTags = process.env.REMOVE_TAGS === 'true';
+            const dryRun = process.env.DRY_RUN !== 'false';
+
+            const all = await github.paginate(github.rest.repos.listReleases, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+
+            const releases = [];
+            for (const release of all) {
+              const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(release.tag_name);
+              if (!match || release.draft || (release.prerelease && !includePrerelease)) {
+                core.info(`Ignoring ${release.tag_name} (not a stable x.y.z release)`);
+                continue;
+              }
+              releases.push({ release, v: match.slice(1).map(Number) });
+            }
+            releases.sort((a, b) => b.v[0] - a.v[0] || b.v[1] - a.v[1] || b.v[2] - a.v[2]);
+
+            const keep = new Set(releases.slice(0, keepCount).map((r) => r.release.id));
+
+            const kept = releases.filter((r) => keep.has(r.release.id));
+            const doomed = releases.filter((r) => !keep.has(r.release.id));
+            core.info(`Parsed ${releases.length} releases. Newest: ${releases[0]?.release.tag_name ?? 'none'}`);
+            core.info(`Keeping ${kept.length}: ${kept.map((r) => r.release.tag_name).join(', ')}`);
+            core.info(`Deleting ${doomed.length}: ${doomed.map((r) => r.release.tag_name).join(', ')}`);
+
+            if (releases.length > 0 && !keep.has(releases[0].release.id)) {
+              core.setFailed('Refusing to run: the newest release would be deleted.');
+              return;
+            }
+            if (dryRun) {
+              core.notice(`Dry run: ${doomed.length} releases would be deleted.`);
+              return;
+            }
+
+            for (const { release } of doomed) {
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id,
+              });
+              if (removeTags) {
+                await github.rest.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `tags/${release.tag_name}`,
+                }).catch((error) => core.warning(`Tag ${release.tag_name} not removed: ${error.message}`));
+              }
+              core.info(`Deleted ${release.tag_name}`);
+            }
