@@ -13,6 +13,17 @@ const state = {
 
 const byId = (id) => document.getElementById(id);
 
+// Keeps the open page across a reload (same lifetime as the session token).
+const navStorageKey = "streamnet:admin-nav";
+const readNav = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem(navStorageKey)) ?? {};
+  } catch {
+    return {};
+  }
+};
+const saveNav = (patch) => sessionStorage.setItem(navStorageKey, JSON.stringify({ ...readNav(), ...patch }));
+
 const metricIcons = {
   accounts:
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
@@ -194,6 +205,7 @@ function logout() {
   state.global = null;
   sessionStorage.removeItem("streamnet:admin-token");
   sessionStorage.removeItem("streamnet:admin-username");
+  sessionStorage.removeItem(navStorageKey);
   byId("dashboard-view").classList.add("hidden");
   byId("login-view").classList.remove("hidden");
   byId("login-password").value = "";
@@ -1250,6 +1262,7 @@ async function openAccount(accountId) {
   );
   const sameAccount = state.selectedAccount?.account.id === data.account.id;
   state.selectedAccount = data;
+  saveNav({ view: "accounts", accountId: data.account.id });
   byId("accounts-view").classList.add("hidden");
   byId("global-view").classList.add("hidden");
   byId("audits-view").classList.add("hidden");
@@ -1510,6 +1523,7 @@ const accountTabNeedsSnapshot = (tab) => ["playlists", "addons", "settings", "sn
 
 function selectAccountTab(tab) {
   state.accountTab = tab;
+  saveNav({ accountTab: tab });
   document.querySelectorAll("[data-acc-tab]").forEach((button) => {
     button.setAttribute("aria-pressed", String(button.dataset.accTab === tab));
   });
@@ -1860,9 +1874,12 @@ function renderAccountInventory(tab) {
         const head = rcElement("div", null, "rc-inv-head");
         head.append(rcElement("strong", playlist.name), rcElement("small", playlist.id));
         const chips = rcElement("div", null, "profile-counts");
-        chips.append(accountChip(playlist.enabled ? "Aktiv" : "Deaktiviert"), accountChip(`Profil: ${profile.name}`));
-        if (playlist.id === "streamnet_tv") chips.append(accountChip("Standard der App"));
-        if (playlist.hostOverride) chips.append(accountChip(`Host überschrieben: ${playlist.hostOverride}`));
+        chips.append(
+          accountChip(playlist.enabled ? "Aktiv" : "Deaktiviert", playlist.enabled ? "is-ok" : "is-danger"),
+          accountChip(`Profil: ${profile.name}`, "is-info"),
+        );
+        if (playlist.id === "streamnet_tv") chips.append(accountChip("Default", "is-accent"));
+        if (playlist.hostOverride) chips.append(accountChip(`Host überschrieben: ${playlist.hostOverride}`, "is-warn"));
         const imports = [["Live-TV", playlist.importLiveTv], ["Filme", playlist.importVod], ["Serien", playlist.importSeries]]
           .filter(([, on]) => on).map(([label]) => label);
         const info = [playlist.host ? `Server: ${playlist.host}` : null, imports.length ? `Import: ${imports.join(", ")}` : "Kein Import aktiv"].filter(Boolean).join(" · ");
@@ -1889,10 +1906,10 @@ function renderAccountInventory(tab) {
       const head = rcElement("div", null, "rc-inv-head");
       head.append(rcElement("strong", addon.name), rcElement("small", addon.id));
       const chips = rcElement("div", null, "profile-counts");
-      chips.append(accountChip(addon.isEnabled ? "Aktiv" : "Deaktiviert"));
-      if (addon.version) chips.append(accountChip(`Version ${addon.version}`));
-      chips.append(accountChip(`In ${addon.profileCount} von ${profiles.length} Profilen`));
-      if (addon.id === "opensubtitles") chips.append(accountChip("Standard der App"));
+      chips.append(accountChip(addon.isEnabled ? "Aktiv" : "Deaktiviert", addon.isEnabled ? "is-ok" : "is-danger"));
+      if (addon.version) chips.append(accountChip(`Version ${addon.version}`, "is-violet"));
+      chips.append(accountChip(`In ${addon.profileCount} von ${profiles.length} Profilen`, "is-info"));
+      if (addon.id === "opensubtitles") chips.append(accountChip("Default", "is-accent"));
       const actions = rcElement("div", null, "rc-inv-actions");
       actions.append(accountCardButton("Aktualisieren", "upsert_addon"), accountCardButton("Entfernen", "delete_addon", { targetId: addon.id }, true));
       card.append(head, chips, rcElement("span", addon.host ? `Quelle: ${addon.host}` : "", "rc-source-info"), actions);
@@ -1936,6 +1953,61 @@ function selectAccountCategory(category) {
   setMessage(byId("mutation-message"), "");
 }
 
+// Shows a select as a group of clickable cards. The hidden select stays the source of
+// truth for all existing logic; the cards mirror and drive it.
+function mirrorSelectAsCards(select, container, { destructive = false } = {}) {
+  const render = () => {
+    const focusedValue = container.contains(document.activeElement) ? document.activeElement.dataset.value : null;
+    const cards = [...select.options].map(option => {
+      const checked = option.value === select.value;
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "rc-action-card";
+      card.setAttribute("role", "radio");
+      card.setAttribute("aria-checked", String(checked));
+      card.tabIndex = checked ? 0 : -1;
+      card.dataset.value = option.value;
+      card.classList.toggle("is-destructive", destructive && /^(delete|clear|remove)_/.test(option.value));
+      card.disabled = select.disabled;
+      card.textContent = option.textContent.replace(/\s+/g, " ").trim();
+      card.addEventListener("click", () => {
+        if (select.value === option.value) return;
+        select.value = option.value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      card.addEventListener("keydown", (event) => {
+        const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+        if (!step) return;
+        event.preventDefault();
+        const siblings = [...container.children];
+        siblings[(siblings.indexOf(card) + step + siblings.length) % siblings.length].click();
+      });
+      return card;
+    });
+    container.replaceChildren(...cards);
+    if (focusedValue !== null) container.querySelector(`[data-value="${CSS.escape(focusedValue)}"]`)?.focus();
+  };
+  let scheduled = false;
+  const schedule = () => {
+    if (scheduled) return;
+    scheduled = true;
+    queueMicrotask(() => {
+      scheduled = false;
+      render();
+    });
+  };
+  select.addEventListener("change", schedule);
+  select.addEventListener("sync-cards", schedule);
+  new MutationObserver(schedule).observe(select, { childList: true });
+  render();
+}
+mirrorSelectAsCards(byId("mutation-operation"), byId("mutation-operation-cards"), { destructive: true });
+mirrorSelectAsCards(byId("mutation-profile"), byId("mutation-profile-cards"));
+mirrorSelectAsCards(byId("delete-addon-select"), byId("delete-addon-cards"));
+mirrorSelectAsCards(byId("delete-playlist-select"), byId("delete-playlist-cards"));
+mirrorSelectAsCards(byId("global-operation"), byId("global-operation-cards"), { destructive: true });
+mirrorSelectAsCards(byId("rc-group-filter"), byId("rc-group-cards"));
+
 function updateOperationFields() {
   const operation = byId("mutation-operation").value;
   const category = globalOperationCategory(operation);
@@ -1951,10 +2023,16 @@ function updateOperationFields() {
   const isHostChange =
     operation === "change_streamnet_host" ||
     operation === "clear_streamnet_host_override";
-  byId("mutation-profile-field").classList.toggle(
+  byId("account-profile-card").classList.toggle(
     "hidden",
     !isProfileScoped && !isHostChange,
   );
+  // Without the profile step the remaining steps move up.
+  [...byId("mutation-form").querySelectorAll(".global-config-card")]
+    .filter((card) => !card.classList.contains("hidden") && card.querySelector(".global-step"))
+    .forEach((card, index) => {
+      card.querySelector(".global-step").textContent = String(index + 1).padStart(2, "0");
+    });
   byId("mutation-profile").required = isProfileScoped;
   // The host change may target all profiles of the account, which the other operations cannot.
   const profileSelect = byId("mutation-profile");
@@ -2203,7 +2281,7 @@ async function loadGlobal() {
     state.defaultCatalogs = (await api("/admin-api/global/default-catalogs")).catalogs;
   } catch (error) {
     state.defaultCatalogs = [];
-    showToast(`Standard-Kataloge konnten nicht geladen werden: ${error.message}`, true);
+    showToast(`Default-Kataloge konnten nicht geladen werden: ${error.message}`, true);
   }
   void loadMdblistTitles();
   byId("global-summary").textContent =
@@ -2360,7 +2438,7 @@ const rcInventories = {
     actions: [["Bearbeiten", "edit_playlist"], ["Host ändern", "change_xtream_host"], ["Entfernen", "delete_playlist"]],
     extra: { streamnet_tv: [["Host zurücksetzen", "clear_streamnet_host_override"]] },
     add: ["Playlist hinzufügen", "add_playlist"],
-    addNote: "Zusätzliche Playlists (M3U oder Xtream), die du an alle bereits registrierten Accounts verteilst. Sie sind unabhängig von der Standard-Playlist der App; Playlists, die Nutzer selbst angelegt haben, bleiben unberührt.",
+    addNote: "Zusätzliche Playlists (M3U oder Xtream), die du an alle bereits registrierten Accounts verteilst. Sie sind unabhängig von der Default-Playlist der App; Playlists, die Nutzer selbst angelegt haben, bleiben unberührt.",
   },
   addons: {
     key: "addons", noun: "Add-on",
@@ -2368,7 +2446,7 @@ const rcInventories = {
     actions: [["Bearbeiten", "edit_addon"], ["Entfernen", "delete_addon"]],
     extra: {},
     add: ["Add-on hinzufügen", "add_addon"],
-    addNote: "Zusätzliche Add-ons, die du an alle bereits registrierten Accounts verteilst. Sie sind unabhängig vom Standard-Add-on der App; Add-ons, die Nutzer selbst installiert haben, bleiben unberührt.",
+    addNote: "Zusätzliche Add-ons, die du an alle bereits registrierten Accounts verteilst. Sie sind unabhängig vom Default-Add-on der App; Add-ons, die Nutzer selbst installiert haben, bleiben unberührt.",
   },
 };
 
@@ -2506,6 +2584,7 @@ const rcAccountTabs = { standards: "catalogs", playlists: "playlists", addons: "
 
 function selectRcTab(tab) {
   rc.tab = tab;
+  saveNav({ rcTab: tab });
   document.querySelectorAll("[data-rc-tab]").forEach((button) => {
     button.setAttribute("aria-pressed", String(button.dataset.rcTab === tab));
   });
@@ -2537,10 +2616,10 @@ async function loadCatalogConfig() {
   renderRcStandards();
 }
 
-function rcMetric(label, value) {
+function rcMetric(label, value, { text = false } = {}) {
   const item = rcElement("div", null, "metric");
   const body = rcElement("div", null, "metric-body");
-  body.append(rcElement("span", label, "metric-label"), rcElement("strong", value, "metric-value"));
+  body.append(rcElement("span", label, "metric-label"), rcElement("strong", value, text ? "metric-value metric-value-text" : "metric-value"));
   item.append(body);
   return item;
 }
@@ -2555,6 +2634,7 @@ function rcEditButton(key) {
     stashRcDraft();
     rc.group = item?.group ?? rc.group;
     byId("rc-group-filter").value = rc.group;
+    byId("rc-group-filter").dispatchEvent(new Event("sync-cards"));
     rc.current = key;
     renderRcFranchiseList();
     renderRcFranchiseForm();
@@ -2580,7 +2660,7 @@ function renderRcOverview() {
       Object.values(overrides.extras || {}).reduce((sum, refs) => sum + refs.length, 0) +
       Object.values(overrides.sources || {}).reduce((sum, value) => sum + (value.curated?.length ?? 0), 0)),
     rcMetric("Home-Kataloge geändert", count(overrides.rows) + (overrides.hidden || []).length + (overrides.newRows || []).length),
-    rcMetric("Letzte Änderung", rc.data.updatedAt ? formatDate(rc.data.updatedAt) : "—"),
+    rcMetric("Letzte Änderung", rc.data.updatedAt ? formatDate(rc.data.updatedAt).replace(", ", "\n") : "—", { text: true }),
   );
 
   const listed = franchises.filter((item) => !item.builtin || item.custom);
@@ -2631,10 +2711,10 @@ function renderRcOverview() {
   for (const [catalogId, value] of Object.entries(overrides.sources || {})) {
     const title = rcStandardTitle(catalogId);
     if (value.tmdbCollections) {
-      rows.push([title, "TMDB-Collections", value.tmdbCollections.length ? `Collection ${value.tmdbCollections.join(", ")} (Filmreihen mit mehreren Filmen)` : "Keine (Standard entfernt)", catalogId]);
+      rows.push([title, "TMDB-Collections", value.tmdbCollections.length ?       `Collection ${value.tmdbCollections.join(", ")} (Filmreihen mit mehreren Filmen)` : "Keine (Default entfernt)", catalogId]);
     }
-    if (value.mdblist) rows.push([title, "MDBList-Listen", value.mdblist.length ? value.mdblist.join(", ") : "Keine (Standard entfernt)", catalogId]);
-    if (value.curated) rows.push([title, "Einzelne Filme / Serien", rcDescribeRefs(value.curated, "Keine (Standard entfernt)"), catalogId]);
+          if (value.mdblist) rows.push([title, "MDBList-Listen", value.mdblist.length ? value.mdblist.join(", ") : "Keine (Default entfernt)", catalogId]);
+          if (value.curated) rows.push([title, "Einzelne Filme / Serien", rcDescribeRefs(value.curated, "Keine (Default entfernt)"), catalogId]);
   }
   for (const [catalogId, refs] of Object.entries(overrides.extras || {})) {
     rows.push([rcStandardTitle(catalogId), "Einzelne Filme / Serien", rcDescribeRefs(refs, "Keine"), catalogId]);
@@ -2646,7 +2726,7 @@ function renderRcOverview() {
     return row;
   }) : [(() => {
     const row = document.createElement("tr");
-    const cell = textCell("Keine Änderungen – es gelten die Standards der App.");
+    const cell = textCell("Keine Änderungen – es gelten die Defaults der App.");
     cell.colSpan = 4;
     row.append(cell);
     return row;
@@ -2682,9 +2762,11 @@ function renderRcFranchiseList() {
     button.type = "button";
     button.className = "rc-franchise-item";
     button.setAttribute("aria-pressed", String(rc.current === item.key));
+    const changed = item.standard && rcIsChanged(item);
+    button.classList.toggle("is-changed", changed);
     const note = rcElement("small");
-    if (item.standard && !rcIsChanged(item)) note.append(rcElement("span", "Default", "default-badge"));
-    else note.textContent = item.standard ? "geändert" : "Eigene";
+    if (item.standard && !changed) note.append(rcElement("span", "Default", "default-badge"));
+    else note.append(rcElement("span", item.standard ? "Geändert" : "Eigene", item.standard ? "changed-badge" : "custom-badge"));
     button.append(rcElement("strong", item.title), note);
     button.addEventListener("click", () => {
       stashRcDraft();
@@ -2929,7 +3011,7 @@ function rcCopyButton(value, label = "Kopieren") {
 }
 
 function rcHint(node, label, value) {
-  node.replaceChildren(`Standard${label ? ` ${label}` : ""}: ${value || "—"}`);
+  node.replaceChildren(rcElement("span", `Default${label ? ` ${label}` : ""}`, "rc-default-label"), `: ${value || "—"}`);
   if (value) node.append(" ", rcCopyButton(value));
 }
 
@@ -3038,15 +3120,19 @@ function renderRcFranchiseForm() {
     byId("rc-f-count").textContent = `${rcLineCount(byId("rc-f-text").value)} Einträge in diesem Tab`;
   }
   const changed = item ? rcIsChanged(item) : false;
-  byId("rc-f-state").textContent = isNewFranchise
+  const stateNode = byId("rc-f-state");
+  stateNode.textContent = isNewFranchise
     ? "Wird nach dem Speichern für alle Geräte als Collection in der Franchise-Reihe angezeigt."
     : isNewCollection
       ? group === "DECADE" ? "Wird nach dem Speichern für alle Geräte als Collection in der Jahrzehnte-Reihe angezeigt." : "Wird nach dem Speichern für alle Geräte als Collection in der Streamingdienste-Reihe angezeigt."
       : standard
-        ? (changed ? "Mit Änderungen gegenüber dem Standard der App." : "Standard der App (noch nicht geändert).")
+        ? (changed ? "Weicht vom Default der App ab." : "Entspricht dem Default der App.")
         : added
           ? (group === "DECADE" ? "Eigenes Jahrzehnt, gilt für alle Geräte." : "Eigener Streamingdienst, gilt für alle Geräte.")
           : `Eigene Franchise (Stand ${franchise.revision}, gespeichert ${formatDate(franchise.updatedAt)}).`;
+  if (standard && !isNewFranchise && !isNewCollection) {
+    stateNode.prepend(rcElement("span", changed ? "Geändert" : "Default", changed ? "changed-badge" : "default-badge"), " ");
+  }
   byId("rc-f-reset").classList.toggle("hidden", !standard);
   byId("rc-f-reset").disabled = !changed;
   byId("rc-f-delete").classList.toggle("hidden", isNew || Boolean(standard));
@@ -3107,6 +3193,7 @@ async function saveRcFranchise(event) {
       delete rc.drafts[key];
       rc.group = group;
       byId("rc-group-filter").value = group;
+      byId("rc-group-filter").dispatchEvent(new Event("sync-cards"));
       rc.current = `added:${group}:${id}`;
     } else if (!item?.standard) {
       const id = isNew ? String(draft.id || "").trim().toLowerCase() : item.franchise.id;
@@ -3161,8 +3248,8 @@ async function removeRcFranchise() {
   const reason = byId("rc-f-reason").value;
   const confirmed = item.standard
     ? await confirmAction({
-      title: "Auf Standard zurücksetzen",
-      message: `„${item.title}“ auf den Standard der App zurücksetzen? Deine Änderungen gehen verloren.`,
+      title: "Auf Default zurücksetzen",
+      message: `„${item.title}“ auf den Default der App zurücksetzen? Deine Änderungen gehen verloren.`,
       confirmLabel: "Zurücksetzen",
       danger: true,
     })
@@ -3243,12 +3330,12 @@ function renderRcStandards() {
       const reset = document.createElement("button");
       reset.type = "button";
       reset.className = "button secondary rc-reset";
-      reset.textContent = "Standard";
+      reset.textContent = "Default";
       reset.addEventListener("click", () => { input.value = item.sourceUrl; refreshRcRowInfo(); });
       input.addEventListener("input", refreshRcRowInfo);
       input.addEventListener("change", refreshRcRowInfo);
       const wrap = rcElement("div", null, "rc-list-input");
-      wrap.append(input, reset, rcCopyButton(item.sourceUrl, "Standard kopieren"));
+      wrap.append(input, reset, rcCopyButton(item.sourceUrl, "Default kopieren"));
       field.append(wrap, info);
       line.append(field);
     }
@@ -3276,7 +3363,7 @@ function refreshRcRowInfo() {
     const info = rcListInfoText(slug ? rc.listInfo[slug] : { title: null, movies: null, shows: null, total: null });
     if (slug && !(slug in rc.listInfo)) missing.push(slug);
     const node = document.querySelector(`[data-rc-info="${input.dataset.rcRow}"]`);
-    const state = changed ? document.createTextNode("Geändert") : rcElement("span", "Default", "default-badge");
+    const state = rcElement("span", changed ? "Geändert" : "Default", changed ? "changed-badge" : "default-badge");
     node.replaceChildren(state, ` · ${slug ? info : "keine gültige MDBList-Liste"}`);
     node.classList.toggle("is-changed", changed);
     input.closest(".rc-list-input").querySelector(".rc-reset").classList.toggle("hidden", !changed);
@@ -3731,6 +3818,7 @@ function selectView(view) {
   document.querySelectorAll(".nav-item").forEach((item) => {
     item.classList.toggle("active", item.dataset.view === view);
   });
+  saveNav({ view, accountId: null });
   byId("dashboard-header-actions").classList.toggle(
     "hidden",
     view !== "dashboard",
@@ -4057,5 +4145,17 @@ document.querySelectorAll("select").forEach(enhanceSelect);
 
 if (state.token) {
   showDashboard();
-  selectView("dashboard");
+  const nav = readNav();
+  selectView(["dashboard", "accounts", "global", "audits"].includes(nav.view) ? nav.view : "dashboard");
+  if (nav.view === "global" && document.querySelector(`[data-rc-tab="${nav.rcTab}"]`)) selectRcTab(nav.rcTab);
+  if (nav.view === "accounts" && nav.accountId) {
+    openAccount(nav.accountId)
+      .then(() => {
+        const snapshotReady = Boolean(state.selectedAccount.snapshot);
+        if (nav.accountTab in accountTabPanels && (snapshotReady || !accountTabNeedsSnapshot(nav.accountTab))) {
+          selectAccountTab(nav.accountTab);
+        }
+      })
+      .catch(() => selectView("accounts"));
+  }
 }

@@ -73,7 +73,7 @@ test("device events have readable labels without hiding unknown event types", ()
 
 test("Remote Config offers only the per-account actions; lists, covers and added titles live in the central areas", async () => {
   const html = await readFile(new URL("../public/admin.html", import.meta.url), "utf8");
-  const select = html.match(/<select id="global-operation">([^]*?)<\/select>/)[1];
+  const select = html.match(/<select\b[^>]*\bid="global-operation"[^>]*>([^]*?)<\/select>/)[1];
   const operations = [...select.matchAll(/value="([^"]+)"/g)].map(match => match[1]);
   const groups = { playlists: [], addons: [], catalogs: [] };
   for (const operation of operations) groups[context.globalOperationCategory(operation)].push(operation);
@@ -125,7 +125,7 @@ test("device list keeps the latest entry per kind, platform and device type", ()
 
 test("individual account actions share the category layout without adding unsupported catalog actions", async () => {
   const html = await readFile(new URL("../public/admin.html", import.meta.url), "utf8");
-  const select = html.match(/<select id="mutation-operation">([^]*?)<\/select>/)[1];
+  const select = html.match(/<select\b[^>]*\bid="mutation-operation"[^>]*>([^]*?)<\/select>/)[1];
   const operations = [...select.matchAll(/value="([^"]+)"/g)].map(match => match[1]);
   assert.deepEqual(operations.filter(operation => context.globalOperationCategory(operation) === "playlists"),
     ["upsert_playlist", "delete_playlist", "change_streamnet_host", "clear_streamnet_host_override"]);

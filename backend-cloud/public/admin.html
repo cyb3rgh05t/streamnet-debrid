@@ -586,19 +586,32 @@
             <div id="rc-franchises" class="rc-panel hidden" data-rc-panel="franchises">
               <p class="rc-intro">
                 Alle Collections der App mit dem Wert, der gerade gilt. Unter jedem Feld steht der
-                Standard der App; leeres Feld oder „Auf Standard“ stellt ihn wieder her.
+                Default der App; leeres Feld oder „Auf Default“ stellt ihn wieder her.
               </p>
+              <div class="rc-action-field rc-group-row">
+                <span id="rc-group-label">Bereich</span>
+                <div
+                  id="rc-group-cards"
+                  class="rc-action-cards"
+                  role="radiogroup"
+                  aria-labelledby="rc-group-label"
+                ></div>
+                <select
+                  id="rc-group-filter"
+                  class="visually-hidden"
+                  data-enhanced="true"
+                  tabindex="-1"
+                  aria-hidden="true"
+                >
+                  <option value="FRANCHISE">Franchises</option>
+                  <option value="SERVICE">Streamingdienste</option>
+                  <option value="DECADE">Jahrzehnte</option>
+                  <option value="MOVIE_GENRE">Film-Genres</option>
+                  <option value="TV_GENRE">Serien-Genres</option>
+                </select>
+              </div>
               <div class="rc-split">
                 <aside class="rc-franchise-list" aria-label="Collections">
-                  <label>Bereich
-                    <select id="rc-group-filter">
-                      <option value="FRANCHISE">Franchises</option>
-                      <option value="SERVICE">Streamingdienste</option>
-                      <option value="DECADE">Jahrzehnte</option>
-                      <option value="MOVIE_GENRE">Film-Genres</option>
-                      <option value="TV_GENRE">Serien-Genres</option>
-                    </select>
-                  </label>
                   <button id="rc-new-item" class="button primary" type="button">Neue Franchise anlegen</button>
                   <div id="rc-franchise-items"></div>
                 </aside>
@@ -668,7 +681,7 @@
                   <label>Kommentar (optional)<input id="rc-f-reason" maxlength="500" /></label>
                   <div class="rc-actions-row">
                     <button class="button primary" type="submit">Speichern</button>
-                    <button id="rc-f-reset" class="button secondary" type="button">Auf Standard zurücksetzen</button>
+                    <button id="rc-f-reset" class="button secondary" type="button">Auf Default zurücksetzen</button>
                     <button id="rc-f-delete" class="button danger" type="button">Franchise löschen</button>
                   </div>
                   <p id="rc-f-message" class="message" role="status"></p>
@@ -680,7 +693,7 @@
               <p class="rc-intro">
                 Alle Home-Kataloge (Reihen der Startseite) der App. Der Schalter bestimmt, ob die Reihe für
                 <strong>alle Geräte</strong> angezeigt wird (auch bei Neuinstallationen); ausgeschaltet verschwindet
-                sie überall. Das Feld zeigt die MDBList-Liste, die gerade gilt, darunter steht der Standard der App.
+                sie überall. Das Feld zeigt die MDBList-Liste, die gerade gilt, darunter steht der Default der App.
                 Zusätzliche Kataloge erscheinen ebenfalls auf allen Geräten.
               </p>
               <form id="rc-standards-form">
@@ -720,7 +733,7 @@
                 Die eigenen M3U-/Xtream-Playlists der Nutzer werden hier nicht aufgelistet und nie verändert.
                 Änderungen betreffen die <strong>bereits registrierten Accounts</strong>, nicht Neuinstallationen.
               </p>
-              <h3 class="rc-heading">Standard-Playlist der App</h3>
+              <h3 class="rc-heading">Default-Playlist der App</h3>
               <div id="rc-inventory-playlists" class="rc-inventory"></div>
               <h3 class="rc-heading">Weitere Playlists</h3>
               <div id="rc-extra-playlists" class="rc-extra"></div>
@@ -733,7 +746,7 @@
                 Ein Add-on „hinzufügen“ legt es bei allen <strong>bereits registrierten Accounts</strong> zusätzlich an;
                 Neuinstallationen bekommen es nicht.
               </p>
-              <h3 class="rc-heading">Standard-Add-on der App</h3>
+              <h3 class="rc-heading">Default-Add-on der App</h3>
               <div id="rc-inventory-addons" class="rc-inventory"></div>
               <h3 class="rc-heading">Weitere Add-ons</h3>
               <div id="rc-extra-addons" class="rc-extra"></div>
@@ -753,13 +766,13 @@
                     <tr><th>Wo</th><td>Collections, Home-Kataloge</td><td>Home-Kataloge (unten), Playlists, Add-ons</td></tr>
                     <tr><th>Wer bekommt es</th><td>Jedes Gerät – auch Neuinstallationen, neue Accounts und Geräte ohne Cloud-Account</td><td>Nur Accounts, die schon in der Cloud registriert sind</td></tr>
                     <tr><th>Wann</th><td>Beim Appstart und danach alle 10 Minuten (Server-Cache 5 Minuten), ohne App-Update</td><td>Sofort in den gespeicherten Daten, das Gerät übernimmt sie beim nächsten Sync</td></tr>
-                    <tr><th>Rückgängig</th><td>„Auf Standard zurücksetzen“ – die Werte der App gelten wieder</td><td>Nur durch eine neue Aktion; vorher zeigt die Vorschau die betroffenen Accounts</td></tr>
+                    <tr><th>Rückgängig</th><td>„Auf Default zurücksetzen“ – die Werte der App gelten wieder</td><td>Nur durch eine neue Aktion; vorher zeigt die Vorschau die betroffenen Accounts</td></tr>
                   </tbody>
                 </table>
 
                 <h3 class="rc-heading">Zentral: was du ändern kannst</h3>
                 <ul>
-                  <li><strong>Collections</strong> – Name, Cover, MDBList-Listen und bei Franchises auch TMDB-Collections und einzelne Filme/Serien jeder Collection (Franchises, Streamingdienste, Jahrzehnte, Genres). Bei Streamingdiensten kommt das Intro-Video dazu. Eigene Franchises (mit Filme-, Serien- und Timeline-Tab), eigene Streamingdienste (über die TMDB-Anbieter-ID) und eigene Jahrzehnte (über eine MDBList-Liste) legst du hier an. Neben jedem Feld steht der Standard der App zum Kopieren.</li>
+                  <li><strong>Collections</strong> – Name, Cover, MDBList-Listen und bei Franchises auch TMDB-Collections und einzelne Filme/Serien jeder Collection (Franchises, Streamingdienste, Jahrzehnte, Genres). Bei Streamingdiensten kommt das Intro-Video dazu. Eigene Franchises (mit Filme-, Serien- und Timeline-Tab), eigene Streamingdienste (über die TMDB-Anbieter-ID) und eigene Jahrzehnte (über eine MDBList-Liste) legst du hier an. Neben jedem Feld steht der Default der App zum Kopieren.</li>
                   <li><strong>Home-Kataloge</strong> – jede Reihe der Startseite ein-/ausblenden (gilt für alle), die MDBList-Liste einer Reihe austauschen und zusätzliche Kataloge hinzufügen.</li>
                 </ul>
                 <p>
@@ -800,7 +813,7 @@
                   <li>Serie zu einer bestehenden Collection: Collection wählen → bei „Einzelne Filme / Serien“ <code>tv:ID</code> eintragen → Speichern.</li>
                   <li>Reihe auf der Startseite austauschen: Home-Kataloge → andere MDBList-Liste eintragen → Speichern.</li>
                   <li>Reihe überall ausblenden: Home-Kataloge → Schalter ausschalten → Speichern.</li>
-                  <li>Etwas versehentlich geändert: Collection oder Reihe öffnen → „Auf Standard zurücksetzen“.</li>
+                  <li>Etwas versehentlich geändert: Collection oder Reihe öffnen → „Auf Default zurücksetzen“.</li>
                 </ol>
               </div>
             </div>
@@ -821,8 +834,21 @@
                       </p>
                     </div>
                   </div>
-                  <label
-                    >Aktion<select id="global-operation">
+                  <div class="rc-action-field">
+                    <span id="global-operation-label">Aktion</span>
+                    <div
+                      id="global-operation-cards"
+                      class="rc-action-cards"
+                      role="radiogroup"
+                      aria-labelledby="global-operation-label"
+                    ></div>
+                    <select
+                      id="global-operation"
+                      class="visually-hidden"
+                      data-enhanced="true"
+                      tabindex="-1"
+                      aria-hidden="true"
+                    >
                       <option value="add_playlist">
                         Playlist global hinzufügen / aktualisieren
                       </option>
@@ -872,8 +898,8 @@
                       <option value="remove_obsolete_catalogs">
                         Veraltetes bereinigen (Netzwerk-, Studio-, Featured-Collections)
                       </option>
-                    </select></label
-                  >
+                    </select>
+                  </div>
                   <label id="global-target-field" class="hidden"
                     >Vorhandener Eintrag
                     <select id="global-target"></select>
@@ -1306,11 +1332,40 @@
               <form id="mutation-form" class="global-config-layout hidden">
                 <div class="global-editor-main">
                   <section
+                    id="account-profile-card"
+                    class="global-config-card"
+                    aria-labelledby="account-profile-title"
+                  >
+                    <div class="global-card-heading">
+                      <span class="global-step" aria-hidden="true">01</span>
+                      <div>
+                        <h3 id="account-profile-title">Profil auswählen</h3>
+                        <p>Die Aktion wird für dieses Profil des Accounts ausgeführt.</p>
+                      </div>
+                    </div>
+                    <div id="mutation-profile-field" class="rc-action-field">
+                      <div
+                        id="mutation-profile-cards"
+                        class="rc-action-cards"
+                        role="radiogroup"
+                        aria-labelledby="account-profile-title"
+                      ></div>
+                      <select
+                        id="mutation-profile"
+                        class="visually-hidden"
+                        data-enhanced="true"
+                        tabindex="-1"
+                        aria-hidden="true"
+                        required
+                      ></select>
+                    </div>
+                  </section>
+                  <section
                     class="global-config-card"
                     aria-labelledby="account-action-title"
                   >
                     <div class="global-card-heading">
-                      <span class="global-step" aria-hidden="true">01</span>
+                      <span class="global-step" aria-hidden="true">02</span>
                       <div>
                         <h3 id="account-action-title">Aktion auswählen</h3>
                         <p id="account-category-description">
@@ -1318,12 +1373,20 @@
                         </p>
                       </div>
                     </div>
-                    <label id="mutation-profile-field"
-                      >Profil<select id="mutation-profile" required></select
-                    ></label>
-                    <label
-                      >Aktion
-                      <select id="mutation-operation">
+                    <div class="rc-action-field">
+                      <div
+                        id="mutation-operation-cards"
+                        class="rc-action-cards"
+                        role="radiogroup"
+                        aria-labelledby="account-action-title"
+                      ></div>
+                      <select
+                        id="mutation-operation"
+                        class="visually-hidden"
+                        data-enhanced="true"
+                        tabindex="-1"
+                        aria-hidden="true"
+                      >
                         <option value="upsert_addon">
                           Add-on hinzufügen / aktualisieren
                         </option>
@@ -1341,14 +1404,14 @@
                           StreamNet TV: Host-Override entfernen
                         </option>
                       </select>
-                    </label>
+                    </div>
                   </section>
                   <section
                     class="global-config-card"
                     aria-labelledby="account-settings-title"
                   >
                     <div class="global-card-heading">
-                      <span class="global-step" aria-hidden="true">02</span>
+                      <span class="global-step" aria-hidden="true">03</span>
                       <div>
                         <h3 id="account-settings-title">
                           Playlist-Einstellungen
@@ -1399,9 +1462,22 @@
                     </div>
 
                     <div id="fields-delete_addon" class="op-fields hidden">
-                      <label
-                        >Add-on<select id="delete-addon-select"></select
-                      ></label>
+                      <div class="rc-action-field">
+                        <span id="delete-addon-label">Add-on</span>
+                        <div
+                          id="delete-addon-cards"
+                          class="rc-action-cards"
+                          role="radiogroup"
+                          aria-labelledby="delete-addon-label"
+                        ></div>
+                        <select
+                          id="delete-addon-select"
+                          class="visually-hidden"
+                          data-enhanced="true"
+                          tabindex="-1"
+                          aria-hidden="true"
+                        ></select>
+                      </div>
                     </div>
 
                     <div id="fields-upsert_playlist" class="op-fields hidden">
@@ -1456,9 +1532,22 @@
                     </div>
 
                     <div id="fields-delete_playlist" class="op-fields hidden">
-                      <label
-                        >Playlist<select id="delete-playlist-select"></select
-                      ></label>
+                      <div class="rc-action-field">
+                        <span id="delete-playlist-label">Playlist</span>
+                        <div
+                          id="delete-playlist-cards"
+                          class="rc-action-cards"
+                          role="radiogroup"
+                          aria-labelledby="delete-playlist-label"
+                        ></div>
+                        <select
+                          id="delete-playlist-select"
+                          class="visually-hidden"
+                          data-enhanced="true"
+                          tabindex="-1"
+                          aria-hidden="true"
+                        ></select>
+                      </div>
                     </div>
                   </section>
                 </div>
@@ -1468,7 +1557,7 @@
                     aria-labelledby="account-confirm-title"
                   >
                     <div class="global-card-heading">
-                      <span class="global-step" aria-hidden="true">03</span>
+                      <span class="global-step" aria-hidden="true">04</span>
                       <div>
                         <h3 id="account-confirm-title">
                           Prüfen &amp; anwenden

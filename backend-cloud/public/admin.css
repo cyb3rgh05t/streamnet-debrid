@@ -1398,6 +1398,31 @@ tbody tr[data-account-id]:focus {
   color: var(--accent);
   font-weight: 600;
 }
+.count-badge.is-ok {
+  border-color: rgba(104, 216, 155, 0.3);
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.count-badge.is-danger {
+  border-color: rgba(255, 135, 120, 0.35);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.count-badge.is-info {
+  border-color: rgba(122, 180, 255, 0.35);
+  background: rgba(122, 180, 255, 0.1);
+  color: #8dbcff;
+}
+.count-badge.is-violet {
+  border-color: rgba(182, 156, 255, 0.35);
+  background: rgba(182, 156, 255, 0.1);
+  color: #c0a9ff;
+}
+.count-badge.is-warn {
+  border-color: rgba(255, 159, 90, 0.4);
+  background: rgba(255, 159, 90, 0.1);
+  color: #ffa65e;
+}
 .count-badge b {
   color: var(--accent);
   font-family: Consolas, monospace;
@@ -2432,9 +2457,10 @@ tbody tr[data-account-id]:focus .account-primary {
 }
 .rc-inventory {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
+  grid-auto-rows: 1fr;
 }
 .rc-inventory > .rc-hint,
 .rc-inventory > .button {
@@ -2452,8 +2478,105 @@ tbody tr[data-account-id]:focus .account-primary {
 .rc-extra .rc-hint {
   margin: 0;
 }
-.rc-inv-card {
+#account-inventory-add {
+  margin: 18px 0;
+}
+#rc-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 900px) {
+  #rc-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+#rc-metrics .metric {
+  align-items: stretch;
+}
+#rc-metrics .metric-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+}
+#rc-metrics .metric-value {
+  margin-top: 0;
+}
+.metric-value-text {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: pre-line;
+}
+.rc-action-field {
   display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.rc-action-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr));
+  gap: 10px;
+}
+.rc-action-card {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.rc-action-card:hover {
+  background: var(--surface-hover);
+}
+.rc-action-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.rc-group-row {
+  margin-bottom: 20px;
+}
+.rc-group-row .rc-action-cards {
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+}
+.rc-action-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.rc-action-card[aria-checked="true"] {
+  border-color: var(--line-strong);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.rc-action-card.is-destructive[aria-checked="true"] {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+.rc-inv-card {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: 16px 18px;
   border: 1px solid var(--line);
@@ -2481,7 +2604,13 @@ tbody tr[data-account-id]:focus .account-primary {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+.rc-inv-actions .button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
 }
 .rc-split {
   display: grid;
@@ -2540,6 +2669,20 @@ tbody tr[data-account-id]:focus .account-primary {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+#rc-f-tabs {
+  display: grid;
+  gap: 16px;
+}
+#rc-f-tabs label {
+  gap: 10px;
+}
+#rc-f-tab-help {
+  line-height: 1.6;
+}
+.rc-default-label {
+  color: var(--accent);
+  font-weight: 600;
 }
 .rc-tab-switch .button[aria-pressed="true"] {
   border-color: var(--accent);
@@ -2945,6 +3088,34 @@ tbody tr[data-account-id]:focus .account-primary {
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
+.changed-badge,
+.custom-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 159, 90, 0.45);
+  border-radius: 999px;
+  color: #ffa65e;
+  background: rgba(255, 159, 90, 0.12);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.custom-badge {
+  border-color: rgba(122, 180, 255, 0.4);
+  color: #8dbcff;
+  background: rgba(122, 180, 255, 0.1);
+}
+.rc-franchise-item.is-changed {
+  border-left: 3px solid #ffa65e;
+  background: rgba(255, 159, 90, 0.05);
+}
+.rc-franchise-item.is-changed[aria-pressed="true"] {
+  border-color: var(--accent);
+  border-left-color: #ffa65e;
+  background: var(--accent-soft);
+}
 .setting-default-tag {
   display: none;
 }
@@ -3002,9 +3173,11 @@ tbody tr[data-account-id]:focus .account-primary {
   }
 }
 .metric .revision-pill {
-  align-self: flex-start;
+  position: absolute;
+  top: 12px;
+  right: 12px;
   min-height: 22px;
-  margin-top: 8px;
+  margin: 0;
   padding: 0 9px;
   font-size: 11px;
 }
@@ -3156,17 +3329,18 @@ tbody tr[data-account-id]:focus .account-primary {
   border-top: 0;
 }
 .rc-extra {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   justify-items: stretch;
   gap: 12px 24px;
 }
 .rc-extra > .button {
-  justify-self: end;
+  order: -1;
+  justify-self: start;
   white-space: nowrap;
 }
 .rc-inventory {
-  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
 }
 @media (max-width: 1100px) {
   .global-confirm-column {
