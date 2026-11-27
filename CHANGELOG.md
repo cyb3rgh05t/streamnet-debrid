@@ -4,6 +4,11 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Web 1.0.091] - 2026-11-27
+
+- Web-Player, Profilauswahl: Hinter den Profilen läuft jetzt wie in den Apps der TMDB-Hintergrund mit den aktuellen Film- und Serien-Trends (je fünf, abwechselnd, Wechsel alle 5 Sekunden mit Überblendung, gleiche Abdunkelung wie in der App). Bei „Bewegung reduzieren“ im System bleibt das erste Bild stehen; schlägt TMDB fehl, bleibt der bisherige Hintergrund.
+- Web-Player, Profilauswahl auf Touch/Handy: Im Hochformat wird statt des beschnittenen 16:9-Bilds das Poster (2:3) als Hintergrund verwendet. Die Profil-Kacheln sind quadratisch (feste Seitenverhältnisse), gleichmäßig zentriert und etwas größer, lange Namen werden gekürzt, die Safe-Areas werden beachtet. Im Querformat auf dem Handy passt der ganze Screen ohne Scrollen. Geprüft im Browser bei 390×844, 844×390 und 1366×768 mit einem Test-Account ohne echte Cloud-Daten; nicht auf einem echten Handy oder mit fünf Profilen.
+
 ## [Backend 1.0.074] - 2026-11-27
 
 - Backend, Sync-Ereignisse: Jedes Ereignis über `/account-sync-events` trägt jetzt `kind` (`snapshot` oder `watch_history`) und passende `changedAreas`. Vorher meldete selbst ein normaler Snapshot-Push „continue_watching“, und jede Fortschritts-Speicherung (`POST /watch-history`, alle 60 s während der Wiedergabe) ließ alle Geräte des Accounts den kompletten Snapshot (im Median 224 KB) herunterladen, obwohl er sich nicht geändert hatte. `POST` und `DELETE /watch-history` nehmen zusätzlich den Header `X-Source-Device-Id` an, damit das sendende Gerät sein eigenes Echo erkennt. Ältere Apps und Web-Versionen funktionieren unverändert weiter.

@@ -347,6 +347,47 @@ async function performTmdbRequest<T>(url: URL, apiKey: string): Promise<T> {
   throw lastError;
 }
 
+export interface ProfileBackdrop {
+  backdrop: string;
+  poster: string;
+}
+
+let profileBackdropsPromise: Promise<ProfileBackdrop[]> | null = null;
+
+/**
+ * Trending movies and shows for the profile selection background: five of each, alternating
+ * (same mix as the apps). Loaded once per page load; failures resolve to an empty list so the
+ * screen simply keeps its plain background.
+ */
+export function loadProfileBackdrops(): Promise<ProfileBackdrop[]> {
+  profileBackdropsPromise ??= (async () => {
+    const [movies, series] = await Promise.all([
+      tmdb<TmdbList>("trending/movie/day", { language: "en-US" }),
+      tmdb<TmdbList>("trending/tv/day", { language: "en-US" }),
+    ]);
+    const pick = (list: TmdbList) =>
+      list.results
+        .filter((item) => item.backdrop_path && item.poster_path)
+        .slice(0, 5)
+        .map((item) => ({
+          backdrop: tmdbImageUrl(config.backdropBase, item.backdrop_path),
+          poster: tmdbImageUrl(config.imageBase, item.poster_path),
+        }));
+    const first = pick(movies);
+    const second = pick(series);
+    const mixed: ProfileBackdrop[] = [];
+    for (let i = 0; i < Math.max(first.length, second.length); i += 1) {
+      if (first[i]) mixed.push(first[i]);
+      if (second[i]) mixed.push(second[i]);
+    }
+    return mixed;
+  })().catch(() => {
+    profileBackdropsPromise = null;
+    return [];
+  });
+  return profileBackdropsPromise;
+}
+
 export async function loadHomeCategories(
   language = "en-US",
   catalogs?: CatalogConfig[],

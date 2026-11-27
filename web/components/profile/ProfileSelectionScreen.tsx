@@ -7,6 +7,7 @@ import { accentColor } from "@/lib/accent";
 import type { Profile } from "@/lib/types";
 import { ProfileAvatarVisual } from "./ProfileAvatar";
 import { ProfileDialog } from "./ProfileDialog";
+import { ProfileBackdropLayer } from "./ProfileBackdrop";
 import { PinDialog } from "./PinDialog";
 import { t } from "@/lib/i18n";
 
@@ -51,6 +52,7 @@ export function ProfileSelectionScreen() {
       className={`profile-shell accent-${settings.accentColor}`}
       style={{ ["--accent" as string]: accentColor(settings.accentColor) }}
     >
+      <ProfileBackdropLayer />
       <div className="profile-center">
         <div className="profile-brand-lockup">
           <img

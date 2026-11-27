@@ -15051,3 +15051,99 @@ html {
     justify-content: space-between;
   }
 }
+
+/* Profile selection: TMDB trending artwork behind the tiles (as in the apps) */
+.profile-shell > .profile-center {
+  position: relative;
+  z-index: 1;
+}
+.profile-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.profile-backdrop img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+  opacity: 0;
+  transition: opacity 1200ms ease;
+}
+.profile-backdrop img.is-active {
+  opacity: 1;
+}
+.profile-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.8),
+      rgba(0, 0, 0, 0.48) 50%,
+      rgba(0, 0, 0, 0.8)
+    ),
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.55),
+      rgba(0, 0, 0, 0.3) 50%,
+      rgba(15, 13, 11, 0.92)
+    );
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-backdrop img {
+    transition: none;
+  }
+}
+
+/* Profile selection on phones: even, centred tiles with a fixed square aspect, and a compact
+   single row on landscape phones where the height is the scarce side */
+@media (max-width: 680px) {
+  .profile-row {
+    grid-template-columns: repeat(2, minmax(0, 156px));
+    justify-content: center;
+    gap: 20px 16px;
+  }
+  .avatar-tile {
+    width: min(38vw, 140px);
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+  .profile-pick span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .profile-shell {
+    align-content: center;
+    padding-block: max(20px, env(safe-area-inset-top))
+      max(20px, env(safe-area-inset-bottom));
+  }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .profile-shell {
+    padding-block: 12px;
+  }
+  .profile-heading {
+    margin-bottom: 14px;
+  }
+  .profile-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .avatar-tile {
+    width: 84px;
+    height: 84px;
+    aspect-ratio: auto;
+  }
+  .manage-profiles-btn {
+    margin-top: 14px;
+  }
+}
