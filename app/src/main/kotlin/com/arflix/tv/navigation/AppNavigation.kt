@@ -173,6 +173,7 @@ fun AppNavigation(
     preloadedHeroLogoUrl: String? = null,
     preloadedLogoCache: Map<String, String> = emptyMap(),
     preloadedTrendingBackdropUrls: List<String> = emptyList(),
+    preloadedTrendingPosterUrls: List<String> = emptyList(),
     currentProfile: Profile? = null,
     isCloudConnected: Boolean = false,
     onSwitchProfile: () -> Unit = {},
@@ -227,6 +228,7 @@ fun AppNavigation(
         composable(Screen.CloudConnect.route) {
             CloudConnectScreen(
                 backdropUrls = preloadedTrendingBackdropUrls,
+                posterUrls = preloadedTrendingPosterUrls,
                 onConnected = { navController.navigateToProfileSelection() },
                 onSkip = {
                     onCloudConnectSkipped()
@@ -476,6 +478,7 @@ fun AppNavigation(
         composable(Screen.ProfileSelection.route) {
             ProfileSelectionScreen(
                 trendingBackdropUrls = preloadedTrendingBackdropUrls,
+                trendingPosterUrls = preloadedTrendingPosterUrls,
                 onProfileSelected = {
                     navigationScope.launch {
                         val target = resolveProfileSetupRoute() ?: Screen.Home.route

@@ -37,6 +37,7 @@ data class StartupState(
     val heroLogoUrl: String? = null,
     val logoCache: Map<String, String> = emptyMap(),
     val trendingBackdropUrls: List<String> = emptyList(),
+    val trendingPosterUrls: List<String> = emptyList(),
     val isAuthenticated: Boolean = false,
     val error: String? = null
 )
@@ -74,13 +75,20 @@ class StartupViewModel @Inject constructor(
                     }
                 }.awaitAll()
             }
-            val movies = categories.getOrNull(0).orEmpty().mapNotNull { it.backdrop }.take(5)
-            val series = categories.getOrNull(1).orEmpty().mapNotNull { it.backdrop }.take(5)
+            // Only titles that have both images, so the backdrop and poster lists stay index-aligned.
+            fun pick(index: Int) = categories.getOrNull(index).orEmpty()
+                .filter { !it.backdrop.isNullOrBlank() && it.image.isNotBlank() }
+                .take(5)
+            val movies = pick(0)
+            val series = pick(1)
             val mixed = (0 until maxOf(movies.size, series.size)).flatMap { index ->
                 listOfNotNull(movies.getOrNull(index), series.getOrNull(index))
-            }.distinct()
+            }.distinctBy { it.backdrop }
             if (mixed.isNotEmpty()) {
-                _state.value = _state.value.copy(trendingBackdropUrls = mixed)
+                _state.value = _state.value.copy(
+                    trendingBackdropUrls = mixed.mapNotNull { it.backdrop },
+                    trendingPosterUrls = mixed.map { it.image },
+                )
             }
         }
     }

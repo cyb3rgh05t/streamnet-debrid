@@ -81,10 +81,12 @@ import coil.compose.AsyncImage
 fun ProfileSelectionScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
     trendingBackdropUrls: List<String> = emptyList(),
+    trendingPosterUrls: List<String> = emptyList(),
     onProfileSelected: () -> Unit,
     onShowAddProfile: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val artworkUrls = com.arflix.tv.ui.startup.rememberTrendingArtworkUrls(trendingBackdropUrls, trendingPosterUrls)
 
     // Create focus requesters for each profile slot and the add button.
     val focusRequesters = remember { List(7) { FocusRequester() } }
@@ -95,11 +97,11 @@ fun ProfileSelectionScreen(
 
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
 
-    LaunchedEffect(trendingBackdropUrls) {
+    LaunchedEffect(artworkUrls) {
         backdropIndex = 0
-        while (trendingBackdropUrls.size > 1) {
+        while (artworkUrls.size > 1) {
             delay(5_000L)
-            backdropIndex = (backdropIndex + 1) % trendingBackdropUrls.size
+            backdropIndex = (backdropIndex + 1) % artworkUrls.size
         }
     }
 
@@ -154,7 +156,7 @@ fun ProfileSelectionScreen(
             .background(appBackgroundDark()),
         contentAlignment = Alignment.Center
     ) {
-        trendingBackdropUrls.getOrNull(backdropIndex)?.let { backdropUrl ->
+        artworkUrls.getOrNull(backdropIndex)?.let { backdropUrl ->
             Crossfade(
                 targetState = backdropUrl,
                 animationSpec = tween(durationMillis = 1_200),

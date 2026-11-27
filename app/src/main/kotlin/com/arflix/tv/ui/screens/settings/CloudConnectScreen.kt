@@ -83,10 +83,12 @@ private const val CloudLinkFallbackUrl = "https://auth.mystreamnet.club/?code="
 fun CloudConnectScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     backdropUrls: List<String> = emptyList(),
+    posterUrls: List<String> = emptyList(),
     onConnected: () -> Unit,
     onSkip: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val artworkUrls = com.arflix.tv.ui.startup.rememberTrendingArtworkUrls(backdropUrls, posterUrls)
     val context = LocalContext.current
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     val accentColor = resolveAccentColor(fallback = AccentYellow)
@@ -96,11 +98,11 @@ fun CloudConnectScreen(
     var backdropIndex by remember { mutableStateOf(0) }
     val dialogOpen = uiState.showCloudEmailPasswordDialog
 
-    LaunchedEffect(backdropUrls) {
+    LaunchedEffect(artworkUrls) {
         backdropIndex = 0
-        while (backdropUrls.size > 1) {
+        while (artworkUrls.size > 1) {
             delay(7_000L)
-            backdropIndex = (backdropIndex + 1) % backdropUrls.size
+            backdropIndex = (backdropIndex + 1) % artworkUrls.size
         }
     }
     var pairingSettled by remember { mutableStateOf(false) }
@@ -135,7 +137,7 @@ fun CloudConnectScreen(
             .background(appBackgroundDark())
     ) {
         CloudConnectBackdrop(
-            url = backdropUrls.getOrNull(backdropIndex),
+            url = artworkUrls.getOrNull(backdropIndex),
             accentColor = accentColor
         )
 

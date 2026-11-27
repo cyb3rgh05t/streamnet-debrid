@@ -493,6 +493,7 @@ class MainActivity : ComponentActivity() {
                         preloadedHeroLogoUrl = startupState.heroLogoUrl,
                         preloadedLogoCache = startupState.logoCache,
                         preloadedTrendingBackdropUrls = startupState.trendingBackdropUrls,
+                        preloadedTrendingPosterUrls = startupState.trendingPosterUrls,
                         onExitApp = { finish() }
                     )
                     com.arflix.tv.ui.components.AppToastHost()
@@ -629,7 +630,9 @@ private fun ComponentActivity.runAfterFirstDraw(block: () -> Unit) {
 @Composable
 fun ArvioLoadingScreen(
     trendingBackdropUrls: List<String> = emptyList(),
+    trendingPosterUrls: List<String> = emptyList(),
 ) {
+    val artworkUrls = com.arflix.tv.ui.startup.rememberTrendingArtworkUrls(trendingBackdropUrls, trendingPosterUrls)
     val infiniteTransition = rememberInfiniteTransition(label = "loading")
     val reveal = remember { Animatable(0f) }
     val accentColor = Color(0xFFFF8800)
@@ -642,11 +645,11 @@ fun ArvioLoadingScreen(
         )
     }
 
-    LaunchedEffect(trendingBackdropUrls) {
+    LaunchedEffect(artworkUrls) {
         backdropIndex = 0
-        while (trendingBackdropUrls.size > 1) {
+        while (artworkUrls.size > 1) {
             delay(5_000L)
-            backdropIndex = (backdropIndex + 1) % trendingBackdropUrls.size
+            backdropIndex = (backdropIndex + 1) % artworkUrls.size
         }
     }
 
@@ -666,7 +669,7 @@ fun ArvioLoadingScreen(
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        trendingBackdropUrls.getOrNull(backdropIndex)?.let { backdropUrl ->
+        artworkUrls.getOrNull(backdropIndex)?.let { backdropUrl ->
             Crossfade(
                 targetState = backdropUrl,
                 animationSpec = tween(durationMillis = 1_200),
@@ -749,6 +752,7 @@ fun ArflixApp(
     preloadedHeroLogoUrl: String? = null,
     preloadedLogoCache: Map<String, String> = emptyMap(),
     preloadedTrendingBackdropUrls: List<String> = emptyList(),
+    preloadedTrendingPosterUrls: List<String> = emptyList(),
     onExitApp: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -782,7 +786,10 @@ fun ArflixApp(
         authState !is AuthState.Loading
 
     if (!startupReady || !startupIntroComplete) {
-        ArvioLoadingScreen(trendingBackdropUrls = preloadedTrendingBackdropUrls)
+        ArvioLoadingScreen(
+            trendingBackdropUrls = preloadedTrendingBackdropUrls,
+            trendingPosterUrls = preloadedTrendingPosterUrls,
+        )
         return
     }
 
@@ -943,6 +950,7 @@ fun ArflixApp(
                 preloadedHeroLogoUrl = preloadedHeroLogoUrl,
                 preloadedLogoCache = preloadedLogoCache,
                 preloadedTrendingBackdropUrls = preloadedTrendingBackdropUrls,
+                preloadedTrendingPosterUrls = preloadedTrendingPosterUrls,
                 currentProfile = activeProfile,
                 isCloudConnected = isCloudConnected,
                 resolveProfileSetupRoute = {
