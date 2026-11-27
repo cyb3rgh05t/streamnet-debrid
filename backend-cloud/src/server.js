@@ -1195,6 +1195,19 @@ async function seedAppSettingDefaults(payload) {
   }
 }
 
+// Measurement only (see scripts/sync-stats.js): never delays or fails a sync, and a missing table is ignored.
+function recordSyncPush(request, accountId, outcome) {
+  const bytes = Math.min(Number(request.headers["content-length"]) || 0, 2 ** 31 - 1);
+  pool
+    .query("insert into sync_push_log (account_id, outcome, payload_bytes) values ($1, $2, $3)", [accountId, outcome, bytes])
+    .then(() => (Math.random() < 0.01
+      ? pool.query("delete from sync_push_log where created_at < now() - interval '14 days'")
+      : null))
+    .catch((error) => {
+      if (error?.code !== "42P01") app.log.warn({ err: error }, "Sync push could not be recorded");
+    });
+}
+
 app.post("/account-sync-push", async (request, reply) => {
   const account = await authenticatedAccount(request);
   const payload = request.body?.payload;
@@ -1219,6 +1232,7 @@ app.post("/account-sync-push", async (request, reply) => {
     const revision = Number(current?.revision || 0);
     if (expectedRevision !== undefined && expectedRevision !== revision) {
       await client.query("rollback");
+      recordSyncPush(request, account.id, "conflict");
       return reply.code(409).send({
         accepted: false,
         reason: "revision_conflict",
@@ -1244,6 +1258,7 @@ app.post("/account-sync-push", async (request, reply) => {
       ],
     );
     await client.query("commit");
+    recordSyncPush(request, account.id, "accepted");
     broadcastAccountSyncRevision(
       account.id,
       nextRevision,

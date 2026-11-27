@@ -4,6 +4,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.071] - 2026-11-27
+
+- Backend, Messung für den Sync-Umbau: Neue Tabelle `sync_push_log` (Migration 015) zählt jeden Cloud-Push mit Größe und Ergebnis (angenommen oder Revisionskonflikt 409), ohne den Sync zu verzögern oder zu stören; Einträge älter als 14 Tage werden automatisch entfernt. Das neue Skript `backend-cloud/scripts/sync-stats.js` gibt Snapshot-Größen (Median, p90, p99, Maximum), die größten Abschnitte im Snapshot, die Größe der Zeilen-Tabellen und die Konfliktquote der letzten 7 Tage aus, nur Zahlen ohne Inhalte. Start auf dem Server: `docker compose exec streamnet-backend node scripts/sync-stats.js`. Vorher `npm run migrate` ausführen. Nicht geprüft: Lauf gegen die echte Datenbank.
+
 ## [2.6.031] - 2026-11-26
 
 - Android, Update: Die In-App-Aktualisierung schlug seit 2.6.029 mit „Abstract classes can't be instantiated! … com.arflix.tv.updater.h“ fehl. R8 hatte die GitHub-Release-Klassen des Update-Checks mit anderen Klassen zusammengelegt bzw. entfernt, sodass Gson die Antwort nicht mehr lesen konnte. Die beiden Klassen sind jetzt per Keep-Regel geschützt; im R8-Mapping von `sideloadStaging` bleiben sie mit unverändertem Namen erhalten. Betroffen sind 2.6.029 und 2.6.030: Diese Versionen können sich nicht selbst aktualisieren und müssen 2.6.031 einmal manuell installieren. Nicht geprüft: Update auf einem Gerät.
