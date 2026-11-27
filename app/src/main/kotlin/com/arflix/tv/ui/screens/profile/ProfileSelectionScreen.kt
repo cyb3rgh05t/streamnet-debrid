@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -53,6 +55,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -189,12 +192,16 @@ fun ProfileSelectionScreen(
             )
         }
 
+        // A landscape phone is only ~360-400dp tall: the logo, tiles and button do not fit at full size,
+        // so touch devices compact the spacing there and may scroll as a last resort.
+        val compactHeight = isTouchDevice && LocalConfiguration.current.screenHeightDp < 480
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 980.dp)
-                .padding(horizontal = 24.dp, vertical = 20.dp)
+                .then(if (isTouchDevice) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                .padding(horizontal = 24.dp, vertical = if (compactHeight) 10.dp else 20.dp)
         ) {
             // Brand logo
             Image(
@@ -203,10 +210,10 @@ fun ProfileSelectionScreen(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .padding(horizontal = 24.dp)
-                    .widthIn(max = if (isTouchDevice) 260.dp else 300.dp)
+                    .widthIn(max = if (compactHeight) 170.dp else if (isTouchDevice) 260.dp else 300.dp)
             )
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(if (compactHeight) 8.dp else 18.dp))
 
             Text(
                 text = stringResource(R.string.whos_watching),
@@ -219,14 +226,14 @@ fun ProfileSelectionScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Profile avatars row
-            val avatarSize = if (isTouchDevice) 90.dp else 120.dp
+            val avatarSize = if (compactHeight) 72.dp else if (isTouchDevice) 90.dp else 120.dp
             val avatarSpacing = if (isTouchDevice) 16.dp else 24.dp
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 820.dp)
-                    .padding(horizontal = 24.dp, vertical = 22.dp),
+                    .padding(horizontal = 24.dp, vertical = if (compactHeight) 8.dp else 22.dp),
                 contentAlignment = Alignment.Center
             ) {
                 if (uiState.isLoading) {
@@ -320,7 +327,7 @@ fun ProfileSelectionScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(if (compactHeight) 6.dp else 20.dp))
 
             // Manage Profiles button
             ManageProfilesButton(

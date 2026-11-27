@@ -6,7 +6,7 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [2.6.034] - 2026-11-27
 
-- Android, Handy im Hochformat: Der TMDB-Hintergrund auf der Profilauswahl, dem Ladescreen und der Cloud-Verbindung zeigt jetzt das Poster (2:3) statt des 16:9-Hintergrunds. Vorher wurde das Querformat-Bild auf dem Hochformat-Display auf einen schmalen, stark vergrößerten Ausschnitt (z. B. ein Gesicht) beschnitten. Im Querformat und auf dem TV bleibt der bisherige Hintergrund. Kompiliert; nicht auf einem Gerät geprüft.
+- Android, Handy im Hochformat: Der TMDB-Hintergrund auf der Profilauswahl, dem Ladescreen und der Cloud-Verbindung zeigt jetzt das Poster (2:3) statt des 16:9-Hintergrunds. Vorher wurde das Querformat-Bild auf dem Hochformat-Display auf einen schmalen, stark vergrößerten Ausschnitt (z. B. ein Gesicht) beschnitten. Im Querformat und auf dem TV bleibt der bisherige Hintergrund. Außerdem ist die Profilauswahl auf dem Handy im Querformat kompakter (kleineres Logo, Kacheln und Abstände) und scrollt im Notfall, damit „Profile verwalten“ nicht mehr unten abgeschnitten wird. Kompiliert; nicht auf einem Gerät geprüft.
 
 ## [Web 1.0.091] - 2026-11-27
 
