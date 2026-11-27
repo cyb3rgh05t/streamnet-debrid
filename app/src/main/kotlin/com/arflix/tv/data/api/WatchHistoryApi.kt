@@ -21,7 +21,8 @@ interface WatchHistoryApi {
     @POST("watch-history")
     suspend fun upsertWatchHistory(
         @Header("Authorization") auth: String,
-        @Body item: WatchHistoryRecord
+        @Body item: WatchHistoryRecord,
+        @Header("X-Source-Device-Id") sourceDeviceId: String? = null
     ): WatchHistoryRecord
 
     @DELETE("watch-history")
@@ -31,6 +32,7 @@ interface WatchHistoryApi {
         @Query("show_tmdb_id") showTmdbId: Int? = null,
         @Query("media_type") mediaType: String? = null,
         @Query("season") season: Int? = null,
-        @Query("episode") episode: Int? = null
+        @Query("episode") episode: Int? = null,
+        @Header("X-Source-Device-Id") sourceDeviceId: String? = null
     )
 }

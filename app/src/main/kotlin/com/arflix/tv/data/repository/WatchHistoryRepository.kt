@@ -205,7 +205,7 @@ class WatchHistoryRepository @Inject constructor(
         try {
             val sentAtMs = System.currentTimeMillis()
             val record = executeBackendCall("save watch progress") { auth ->
-                watchHistoryApi.upsertWatchHistory(auth = auth, item = entry.toRecord())
+                watchHistoryApi.upsertWatchHistory(auth = auth, item = entry.toRecord(), sourceDeviceId = sourceDeviceId())
             }
             recordOwnPush(pushKey, record, sentAtMs, System.currentTimeMillis())
             saved = true
@@ -214,7 +214,7 @@ class WatchHistoryRepository @Inject constructor(
                 val fallback = entry.copy(stream_key = null, stream_addon_id = null, stream_title = null)
                 val sentAtMs = System.currentTimeMillis()
                 val record = executeBackendCall("save watch progress fallback") { auth ->
-                    watchHistoryApi.upsertWatchHistory(auth = auth, item = fallback.toRecord())
+                    watchHistoryApi.upsertWatchHistory(auth = auth, item = fallback.toRecord(), sourceDeviceId = sourceDeviceId())
                 }
                 recordOwnPush(pushKey, record, sentAtMs, System.currentTimeMillis())
                 saved = true
@@ -468,7 +468,8 @@ class WatchHistoryRepository @Inject constructor(
                     profileId = currentProfileQuery(),
                     showTmdbId = tmdbId,
                     season = season,
-                    episode = episode
+                    episode = episode,
+                    sourceDeviceId = sourceDeviceId()
                 )
             }
         } catch (e: Exception) {
@@ -487,7 +488,8 @@ class WatchHistoryRepository @Inject constructor(
             executeBackendCall("clear watch history") { auth ->
                 watchHistoryApi.deleteWatchHistory(
                     auth = auth,
-                    profileId = currentProfileQuery()
+                    profileId = currentProfileQuery(),
+                    sourceDeviceId = sourceDeviceId()
                 )
             }
             cachedWatchHistory = emptyList()
@@ -509,6 +511,15 @@ class WatchHistoryRepository @Inject constructor(
         watchHistoryFetchedAtByProfile.clear()
         continueWatchingFetchedAtByProfile.clear()
     }
+
+    /** Another device changed the history: the next read must go to the backend instead of the burst cache. */
+    fun invalidateFetchCache() {
+        watchHistoryFetchedAtByProfile.clear()
+        continueWatchingFetchedAtByProfile.clear()
+    }
+
+    private fun sourceDeviceId(): String? =
+        runCatching { authRepositoryProvider.get().syncSourceDeviceId }.getOrNull()
 
     private suspend fun <T> executeBackendCall(
         operation: String,

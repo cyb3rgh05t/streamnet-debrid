@@ -27,6 +27,7 @@ import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 
 /** Cloud sync connection status for the UI indicator. */
@@ -46,7 +47,8 @@ enum class CloudSyncStatus { CONNECTED, RECONNECTING, NOT_SIGNED_IN }
 class RealtimeSyncManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val cloudSyncRepository: CloudSyncRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val watchHistoryRepositoryProvider: Provider<WatchHistoryRepository>
 ) {
     companion object {
         private const val TAG = "RealtimeSync"
@@ -71,6 +73,7 @@ class RealtimeSyncManager @Inject constructor(
     private var periodicSyncJob: Job? = null
     private var reconnectJob: Job? = null
     private var pendingPullJob: Job? = null
+    private var pendingHistoryJob: Job? = null
 
     @Volatile
     private var activeSseResponse: Response? = null
@@ -125,6 +128,7 @@ class RealtimeSyncManager @Inject constructor(
         periodicSyncJob?.cancel()
         reconnectJob?.cancel()
         pendingPullJob?.cancel()
+        pendingHistoryJob?.cancel()
         _syncStatusFlow.value = CloudSyncStatus.NOT_SIGNED_IN
     }
 
@@ -212,11 +216,26 @@ class RealtimeSyncManager @Inject constructor(
                     Log.d(TAG, "Ignoring echo of own push")
                     return
                 }
+                // Only the Continue Watching list changed: refresh that list, do not download the snapshot.
+                // Servers or events without `kind` keep the full pull below.
+                if (obj.optString("kind", "") == "watch_history") {
+                    debouncedWatchHistoryRefresh()
+                    return
+                }
                 debouncedPull()
             }
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             Log.w(TAG, "Failed to parse SSE message: ${e.message}")
+        }
+    }
+
+    private fun debouncedWatchHistoryRefresh() {
+        pendingHistoryJob?.cancel()
+        pendingHistoryJob = scope.launch {
+            delay(DEBOUNCE_MS)
+            watchHistoryRepositoryProvider.get().invalidateFetchCache()
+            _watchHistoryEvents.tryEmit(Unit)
         }
     }
 

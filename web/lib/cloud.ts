@@ -973,6 +973,24 @@ export function getRawPayloadRevision(userId?: string): number {
   return rawPayloadRevision.revision;
 }
 
+/** Revision of the stored snapshot without downloading it; null when the backend cannot tell (older backends). */
+export async function fetchRemoteRevision(
+  auth: AuthClient,
+): Promise<number | null> {
+  if (!auth.session) return null;
+  try {
+    const response = await backendRequest<{ revision?: number }>(
+      auth,
+      "account-sync-revision",
+      { method: "GET" },
+    );
+    const revision = Number(response?.revision);
+    return Number.isSafeInteger(revision) && revision >= 0 ? revision : null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchRawPayload(auth: AuthClient): Promise<RawPayload> {
   if (!auth.session) return {};
   const response = await backendRequest<AccountSyncPullResponse>(

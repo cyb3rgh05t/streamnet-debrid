@@ -24,6 +24,7 @@ import { registerAdminRoutes } from "./admin-routes.js";
 import { applyAppSettingValues } from "./admin-snapshots.js";
 import { readAppSettingDefaults } from "./app-setting-defaults.js";
 import { registerPresenceRoutes } from "./presence.js";
+import { buildAccountSyncEvent, syncEventKinds } from "./sync-events.js";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: config.databaseUrl });
@@ -207,17 +208,13 @@ function broadcastAccountSyncRevision(
   accountId,
   revision,
   sourceDeviceId = null,
-  changedAreas = ["continue_watching"],
+  kind = syncEventKinds.snapshot,
 ) {
   const clients = sseClientsByAccount.get(accountId);
   if (!clients || clients.size === 0) return;
-  const eventPayload = JSON.stringify({
-    type: "account_sync_revision",
-    revision,
-    sourceDeviceId: sourceDeviceId || null,
-    changedAreas,
-    occurredAt: new Date().toISOString(),
-  });
+  const eventPayload = JSON.stringify(
+    buildAccountSyncEvent({ revision, sourceDeviceId, kind }),
+  );
   const data = `data: ${eventPayload}\n\n`;
   for (const clientReply of clients) {
     try {
@@ -368,9 +365,12 @@ app.post("/watch-history", async (request, reply) => {
     ],
   );
   const response = watchHistoryPayload(result.rows[0]);
-  broadcastAccountSyncRevision(account.id, Date.now(), null, [
-    "continue_watching",
-  ]);
+  broadcastAccountSyncRevision(
+    account.id,
+    Date.now(),
+    request.headers["x-source-device-id"],
+    syncEventKinds.watchHistory,
+  );
   return response;
 });
 
@@ -398,9 +398,12 @@ app.delete("/watch-history", async (request, reply) => {
     `delete from watch_history where ${filters.join(" and ")}`,
     values,
   );
-  broadcastAccountSyncRevision(account.id, Date.now(), null, [
-    "continue_watching",
-  ]);
+  broadcastAccountSyncRevision(
+    account.id,
+    Date.now(),
+    request.headers["x-source-device-id"],
+    syncEventKinds.watchHistory,
+  );
   return reply.code(204).send();
 });
 
@@ -1159,6 +1162,16 @@ app.get("/account-sync-events", async (request, reply) => {
   request.raw.on("close", cleanup);
   request.raw.on("end", cleanup);
   return reply;
+});
+
+// Cheap change check for clients that poll: the revision without downloading the snapshot.
+app.get("/account-sync-revision", async (request) => {
+  const account = await authenticatedAccount(request);
+  const result = await pool.query(
+    "select revision from account_sync_snapshots where account_id = $1",
+    [account.id],
+  );
+  return { revision: Number(result.rows[0]?.revision || 0) };
 });
 
 app.route({

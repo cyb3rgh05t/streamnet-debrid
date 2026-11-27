@@ -4,6 +4,19 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.074] - 2026-11-27
+
+- Backend, Sync-Ereignisse: Jedes Ereignis über `/account-sync-events` trägt jetzt `kind` (`snapshot` oder `watch_history`) und passende `changedAreas`. Vorher meldete selbst ein normaler Snapshot-Push „continue_watching“, und jede Fortschritts-Speicherung (`POST /watch-history`, alle 60 s während der Wiedergabe) ließ alle Geräte des Accounts den kompletten Snapshot (im Median 224 KB) herunterladen, obwohl er sich nicht geändert hatte. `POST` und `DELETE /watch-history` nehmen zusätzlich den Header `X-Source-Device-Id` an, damit das sendende Gerät sein eigenes Echo erkennt. Ältere Apps und Web-Versionen funktionieren unverändert weiter.
+- Backend, neuer Endpunkt `GET /account-sync-revision` liefert nur die aktuelle Revision des Snapshots, ohne ihn zu übertragen. Nicht geprüft: auf echten Geräten.
+
+## [2.6.033] - 2026-11-27
+
+- Android, Cloud-Sync: Ein Fortschritt von einem anderen Gerät (Continue Watching) aktualisiert jetzt nur noch die Continue-Watching-Liste (kleine Abfrage), statt den ganzen Cloud-Snapshot herunterzuladen und anzuwenden. Dadurch erscheint er auf dem zweiten Gerät wenige Sekunden nach dem Speichern auf dem ersten (alle 60 s während der Wiedergabe, bei Pause und Ende sofort), und die 5-Minuten-Verzögerung aus 2.6.032 entfällt für diese Liste. Das eigene Gerät ignoriert sein Echo. Benötigt Backend 1.0.074; mit einem älteren Backend verhält sich die App wie bisher. Nicht geprüft: auf einem Gerät.
+
+## [Web 1.0.090] - 2026-11-27
+
+- Web-Player, Cloud-Sync: Der Abgleich alle 10 Sekunden fragt zuerst nur die Revision ab und lädt den Snapshot nur, wenn er sich geändert hat (vorher jedes Mal komplett, bei geöffnetem Tab über 1 MB pro Minute). Eigene Änderungen lösen kein erneutes Laden mehr aus. Benötigt Backend 1.0.074; bei einem älteren Backend bleibt das alte Verhalten. Nicht geprüft: im Browser.
+
 ## [Backend 1.0.073] - 2026-11-27
 
 - Backend, Messung: `scripts/sync-stats.js` zeigt jetzt zusätzlich die zehn Accounts mit den meisten Cloud-Pushes der letzten 24 Stunden (Kurz-ID, Anzahl, Pushes pro Stunde, Konflikte, Upload und Zeitspanne), um Accounts mit ungewöhnlich vielen Schreibvorgängen zu finden. Nur Zahlen, keine E-Mails oder Inhalte. Nicht geprüft: Lauf gegen die echte Datenbank.

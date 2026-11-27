@@ -9,6 +9,7 @@ const allowed = new Set([
   "tv-auth-web",
   "tv-auth-complete",
   "account-sync-pull",
+  "account-sync-revision",
   "account-sync-push",
   "account-sync-events",
   "watch-history",

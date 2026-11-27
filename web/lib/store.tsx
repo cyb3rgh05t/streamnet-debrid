@@ -48,6 +48,7 @@ import {
   hasPendingCloudPayload,
   saveWatchedState,
   getRawPayloadRevision,
+  fetchRemoteRevision,
 } from "./cloud";
 import { subscribeCloudSyncEvents } from "./cloudSyncEvents";
 import {
@@ -2442,6 +2443,10 @@ export function AppProvider({
       checking = true;
       try {
         const before = getRawPayloadRevision(session.userId);
+        if (initialized && before > 0) {
+          const remote = await fetchRemoteRevision(authClient);
+          if (remote !== null && remote === before) return;
+        }
         await pullRawPayload(authClient);
         const after = getRawPayloadRevision(session.userId);
         if (initialized && after > before && !disposed) {
