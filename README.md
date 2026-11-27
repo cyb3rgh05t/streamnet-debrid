@@ -1,33 +1,75 @@
-![StreamNet](screenshots/streamnetapp-logo.svg)
+<div align="center">
 
-StreamNet Debrid is a StreamNet-focused Android TV APK with its own cloud/auth backend.
+<img src="screenshots/streamnetapp-logo.svg" alt="StreamNet" width="320">
 
-## Screenshots
+# StreamNet Debrid
 
-### Mobile
+**A StreamNet-focused Android TV APK with its own cloud/auth backend.**
 
-| Home                                                                          | Live TV                                                                       |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| ![StreamNet mobile home screen](screenshots/mobile/mobile-home.png)           | ![StreamNet mobile Live TV screen](screenshots/mobile/mobile-live.png)        |
-| Profiles                                                                      | IPTV VOD                                                                      |
-| ![StreamNet mobile profile selection](screenshots/mobile/mobile-profiles.png) | ![StreamNet mobile IPTV VOD screen](screenshots/mobile/mobile-vod-screen.png) |
+</div>
 
-### Tablet
+---
 
-| Home                                                                   | Home catalog                                                                 |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| ![StreamNet tablet home screen](screenshots/tablet/tablet-home.png)    | ![StreamNet tablet home catalog](screenshots/tablet/tablet-home2.png)        |
-| Live TV                                                                | Profiles                                                                     |
-| ![StreamNet tablet Live TV screen](screenshots/tablet/tablet-live.png) | ![StreamNet tablet profile selection](screenshots/tablet/tablet-profile.png) |
-| IPTV VOD                                                               |                                                                              |
-| ![StreamNet tablet IPTV VOD screen](screenshots/tablet/tablet-vod.png) |                                                                              |
+## 📸 Screenshots
 
-### TV
+### 📱 Mobile
 
-| Home                                                          | Live TV                                                  |
-| ------------------------------------------------------------- | -------------------------------------------------------- |
-| ![StreamNet home screen](screenshots/tv/tv-home.png)          | ![StreamNet Live TV screen](screenshots/tv/tv-live.png)  |
-| Profiles                                                      | IPTV VOD                                                 |
-| ![StreamNet profile selection](screenshots/tv/tv-profile.png) | ![StreamNet IPTV VOD catalog](screenshots/tv/tv-vod.png) |
-| IPTV VOD details                                              |                                                          |
-| ![StreamNet IPTV VOD details](screenshots/tv/tv-vod2.png)     |                                                          |
+<table align="center">
+  <tr>
+    <td align="center" width="25%"><b>Profiles</b><br><br><img src="screenshots/mobile/mobile-profiles.png" alt="StreamNet mobile home screen"></td>
+    <td align="center" width="25%"><b>Home</b><br><br><img src="screenshots/mobile/mobile-home.png" alt="StreamNet mobile Live TV screen"></td>
+    <td align="center" width="25%"><b>Live TV</b><br><br><img src="screenshots/mobile/mobile-live.png" alt="StreamNet mobile profile selection"></td>
+    <td align="center" width="25%"><b>VOD Movies</b><br><br><img src="screenshots/mobile/mobile-vod-screen.png" alt="StreamNet mobile IPTV VOD screen"></td>
+    <td align="center" width="25%"><b>IPTV VOD</b><br><br><img src="screenshots/mobile/mobile-vod2.png" alt="StreamNet mobile VOD Series"></td>
+  </tr>
+</table>
+
+### 📲 Tablet
+
+<table align="center">
+  <tr>
+    <td align="center" width="33%"><b>Profiles</b><br><br><img src="screenshots/tablet/tablet-profile.png" alt="StreamNet tablet home screen"></td>
+    <td align="center" width="33%"><b>Home</b><br><br><img src="screenshots/tablet/tablet-home2.png" alt="StreamNet tablet home catalog"></td>
+    <td align="center" width="33%"><b>Live TV</b><br><br><img src="screenshots/tablet/tablet-live.png" alt="StreamNet tablet Live TV screen"></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><b>VOD Movies</b><br><br><img src="screenshots/tablet/tablet-vod.png" alt="StreamNet tablet IPTV VOD screen"></td>
+    <td align="center" width="33%"><b>VOD Series</b><br><br><img src="screenshots/tablet/tablet-vod.png" alt="StreamNet tablet IPTV VOD screen"></td>
+    <td></td>
+    </td>
+  </tr>
+</table>
+
+### 📺 TV
+
+<table align="center">
+  <tr>
+    <td align="center" width="50%"><b>Profiles</b><br><br><img src="screenshots/tv/tv-profile.png" alt="StreamNet home screen"></td>
+    <td align="center" width="50%"><b>Home</b><br><br><img src="screenshots/tv/tv-home.png" alt="StreamNet Live TV screen"></td>
+  </tr>
+  <tr>
+    <td align="center" width="50%"><b>Live TV</b><br><br><img src="screenshots/tv/tv-live.png" alt="StreamNet profile selection"></td>
+    <td align="center" width="50%"><b>VOD Movies</b><br><br><img src="screenshots/tv/tv-vod.png" alt="StreamNet IPTV VOD catalog"></td>
+  </tr>
+  <tr>
+    <td align="center" width="50%"><b>VOD Series</b><br><br><img src="screenshots/tv/tv-vod2.png" alt="StreamNet IPTV VOD details"></td>
+    <td></td>
+  </tr>
+</table>
+
+### 🌐 Web
+
+<table align="center">
+  <tr>
+    <td align="center" width="50%"><b>Home</b><br><br><img src="screenshots/web/web-profile.png" alt="StreamNet web home screen"></td>
+    <td align="center" width="50%"><b>Live TV</b><br><br><img src="screenshots/web/web-home.png" alt="StreamNet web Live TV screen"></td>
+  </tr>
+  <tr>
+    <td align="center" width="50%"><b>Profiles</b><br><br><img src="screenshots/web/web-livetv.png" alt="StreamNet web profile selection"></td>
+    <td align="center" width="50%"><b>VOD Movies</b><br><br><img src="screenshots/web/web-vod1.png" alt="StreamNet web IPTV VOD catalog"></td>
+  </tr>
+  <tr>
+    <td align="center" width="50%"><b>VOD Series</b><br><br><img src="screenshots/web/web-vod2.png" alt="StreamNet web IPTV VOD details"></td>
+    <td></td>
+  </tr>
+</table>
