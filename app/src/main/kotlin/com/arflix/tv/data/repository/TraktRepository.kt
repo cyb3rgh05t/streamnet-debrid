@@ -2385,6 +2385,10 @@ class TraktRepository @Inject constructor(
         streamTitle: String? = null,
         year: String = "",
         onlyIfNotUpdatedAfter: Long? = null,
+        // False for the periodic progress tick of a running playback: it is stored locally and rides along with the
+        // next push (pause, end, or the playback's own cloud interval) instead of uploading the whole snapshot
+        // every minute.
+        notifyCloud: Boolean = true,
     ) {
         ensureProfileCacheScope()
         if (SportsAddonCapabilities.isLiveStreamOrSportsItem(
@@ -2470,11 +2474,13 @@ class TraktRepository @Inject constructor(
             preloadedProfileCache[currentProfileId()] = trimmed
         }
         continueWatchingUpdates.upsert(currentProfileId(), item)
-        cloudSyncInvalidationBus.markDirty(
-            CloudSyncScope.LOCAL_HISTORY,
-            currentProfileId(),
-            "playback progress saved",
-        )
+        if (notifyCloud) {
+            cloudSyncInvalidationBus.markDirty(
+                CloudSyncScope.LOCAL_HISTORY,
+                currentProfileId(),
+                "playback progress saved",
+            )
+        }
     }
 
     /**

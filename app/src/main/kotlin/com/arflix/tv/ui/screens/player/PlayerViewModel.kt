@@ -4298,6 +4298,8 @@ class PlayerViewModel @Inject constructor(
                         currentTime - progressState.lastWatchHistorySaveTime >= WATCH_HISTORY_UPDATE_INTERVAL_MS || hasSeekJump)
                 }
                 if (persistHistory) {
+                    // A running playback only uploads on pause/end or once per CLOUD_PUSH_INTERVAL_MS.
+                    val cloudDue = !isPlaying || currentTime - progressState.lastCloudPushTime >= CLOUD_PUSH_INTERVAL_MS
                     traktRepository.saveLocalContinueWatching(
                         mediaType = mediaType,
                         tmdbId = mediaId,
@@ -4315,10 +4317,11 @@ class PlayerViewModel @Inject constructor(
                         streamKey = streamKey,
                         streamAddonId = savedAddonId,
                         streamTitle = streamTitle,
+                        notifyCloud = cloudDue,
                     )
                     progressState.lastWatchHistorySaveTime = currentTime
                     progressState.lastWatchHistorySavedPositionSeconds = positionSeconds
-                    pushCloud = !isPlaying || currentTime - progressState.lastCloudPushTime >= CLOUD_PUSH_INTERVAL_MS
+                    pushCloud = cloudDue
                     refreshLauncher = !isPlaying
                 }
                 markWatched = !isLiveStreamOrSports && !progressState.hasMarkedWatched && isCompleted
