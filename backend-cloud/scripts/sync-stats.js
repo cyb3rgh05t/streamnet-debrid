@@ -88,6 +88,34 @@ try {
     console.log(`  Seit ${new Date(pushes.since).toISOString()}: ${total} Pushes von ${pushes.accounts} Accounts`);
     console.log(`  Angenommen ${pushes.accepted} · Konflikte (409) ${pushes.conflicts} = ${((Number(pushes.conflicts) / total) * 100).toFixed(1)} %`);
     console.log(`  Ø Push-Größe ${kb(pushes.avg_bytes)} · hochgeladen gesamt ${kb(pushes.total_bytes)}`);
+
+    // Accounts that push far more often than the rest. Short ids only, no emails or content.
+    const top = (await pool.query(
+      `select left(account_id::text, 8) as id,
+              count(*) as pushes,
+              count(*) filter (where outcome = 'conflict') as conflicts,
+              coalesce(sum(payload_bytes), 0) as bytes,
+              min(created_at) as first_at,
+              max(created_at) as last_at
+         from sync_push_log
+        where created_at > now() - interval '24 hours'
+        group by account_id
+        order by pushes desc
+        limit 10`,
+    )).rows;
+    if (top.length) {
+      console.log("\nAuffällige Accounts, letzte 24 Stunden (nach Anzahl Pushes):");
+      console.log("  ID        Pushes  pro Std.  409   Upload        erster → letzter Push (UTC)");
+      for (const row of top) {
+        const spanHours = Math.max((new Date(row.last_at) - new Date(row.first_at)) / 3_600_000, 1);
+        const perHour = Number(row.pushes) / spanHours;
+        const time = (value) => new Date(value).toISOString().slice(11, 16);
+        console.log(
+          `  ${row.id}  ${String(row.pushes).padStart(6)}  ${perHour.toFixed(1).padStart(8)}  ` +
+          `${String(row.conflicts).padStart(3)}  ${kb(row.bytes).padStart(10)}   ${time(row.first_at)} → ${time(row.last_at)}`,
+        );
+      }
+    }
   }
 } finally {
   await pool.end();

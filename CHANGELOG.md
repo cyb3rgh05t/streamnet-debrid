@@ -4,6 +4,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.073] - 2026-11-27
+
+- Backend, Messung: `scripts/sync-stats.js` zeigt jetzt zusätzlich die zehn Accounts mit den meisten Cloud-Pushes der letzten 24 Stunden (Kurz-ID, Anzahl, Pushes pro Stunde, Konflikte, Upload und Zeitspanne), um Accounts mit ungewöhnlich vielen Schreibvorgängen zu finden. Nur Zahlen, keine E-Mails oder Inhalte. Nicht geprüft: Lauf gegen die echte Datenbank.
+
 ## [Backend 1.0.072] - 2026-11-27
 
 - Backend, Cloud-Sync: Die alte Gesamtliste `catalogs` im Snapshot (rund 38 % aller gespeicherten Snapshot-Daten, Messung auf 134 Accounts) wird beim Speichern entfernt, sobald jedes Profil einen eigenen Eintrag in `catalogsByProfile` hat. Apps und Web-Player lesen sie nur als Rückfall für Profile ohne diesen Eintrag; Snapshots, die dieses Kriterium nicht erfüllen, behalten sie. Bestehende Snapshots werden beim nächsten Push des Accounts kleiner, jeder Download (Pull, Revisionsabgleich) wird um etwa ein Drittel kleiner. Nicht geprüft: auf echten Geräten.
