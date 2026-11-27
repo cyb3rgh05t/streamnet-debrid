@@ -1,10 +1,29 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  dropRedundantLegacyCatalogs,
   mergePushPayloadByFieldTimestamps,
   payloadMetrics,
   payloadUpdatedAtMillis,
 } from "../src/snapshots.js";
+
+test("the legacy catalogs list is dropped only when every profile has its own catalogs entry", () => {
+  const complete = { profiles: [{ id: "a" }, { id: "b" }], catalogs: [{ id: "x" }], catalogsByProfile: { a: [], b: [{ id: "x" }] } };
+  assert.equal(dropRedundantLegacyCatalogs(complete), true);
+  assert.equal(Object.hasOwn(complete, "catalogs"), false);
+  assert.deepEqual(complete.catalogsByProfile.b, [{ id: "x" }]);
+
+  for (const kept of [
+    { profiles: [{ id: "a" }, { id: "b" }], catalogs: [{ id: "x" }], catalogsByProfile: { a: [] } },
+    { profiles: [{ id: "a" }], catalogs: [{ id: "x" }] },
+    { profiles: [], catalogs: [{ id: "x" }], catalogsByProfile: {} },
+    { profiles: [{ id: "a" }], catalogsByProfile: { a: [] } },
+  ]) {
+    const before = JSON.stringify(kept);
+    assert.equal(dropRedundantLegacyCatalogs(kept), false);
+    assert.equal(JSON.stringify(kept), before);
+  }
+});
 
 test("ranks a populated multi-profile snapshot above a partial payload", () => {
   const metrics = payloadMetrics({

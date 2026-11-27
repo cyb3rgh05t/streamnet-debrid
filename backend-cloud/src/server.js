@@ -12,6 +12,7 @@ import {
 } from "./passwords.js";
 import { normalizeAndValidateEmail } from "./email.js";
 import {
+  dropRedundantLegacyCatalogs,
   mergePushPayloadByFieldTimestamps,
   payloadMetrics,
   payloadUpdatedAtMillis,
@@ -1245,6 +1246,7 @@ app.post("/account-sync-push", async (request, reply) => {
       payload,
       current?.payload,
     );
+    dropRedundantLegacyCatalogs(storedPayload);
     const nextRevision = revision + 1;
     await client.query(
       `insert into account_sync_snapshots (account_id, payload, revision, payload_updated_at, source)

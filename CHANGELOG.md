@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.072] - 2026-11-27
+
+- Backend, Cloud-Sync: Die alte Gesamtliste `catalogs` im Snapshot (rund 38 % aller gespeicherten Snapshot-Daten, Messung auf 134 Accounts) wird beim Speichern entfernt, sobald jedes Profil einen eigenen Eintrag in `catalogsByProfile` hat. Apps und Web-Player lesen sie nur als Rückfall für Profile ohne diesen Eintrag; Snapshots, die dieses Kriterium nicht erfüllen, behalten sie. Bestehende Snapshots werden beim nächsten Push des Accounts kleiner, jeder Download (Pull, Revisionsabgleich) wird um etwa ein Drittel kleiner. Nicht geprüft: auf echten Geräten.
+
+## [2.6.032] - 2026-11-27
+
+- Android, Cloud-Sync: Während der Wiedergabe wird der Fortschritt nicht mehr jede Minute als kompletter Cloud-Snapshot hochgeladen. Er wird lokal gespeichert und geht bei Pause, Ende oder spätestens alle 5 Minuten mit hoch. Vorher löste jede Fortschritts-Speicherung (alle 60 s, bei Pause und bei Sprüngen) einen Voll-Push samt Voll-Download aus und weckte alle anderen Geräte des Accounts zu einem Pull; einzelne Accounts kamen so auf über 50.000 Schreibvorgänge. Weiterschauen auf einem zweiten Gerät sieht den Stand dadurch bei laufender Wiedergabe bis zu 5 Minuten später (bei Pause und Ende sofort). Nicht geprüft: auf einem Gerät.
+
 ## [Backend 1.0.071] - 2026-11-27
 
 - Backend, Messung für den Sync-Umbau: Neue Tabelle `sync_push_log` (Migration 015) zählt jeden Cloud-Push mit Größe und Ergebnis (angenommen oder Revisionskonflikt 409), ohne den Sync zu verzögern oder zu stören; Einträge älter als 14 Tage werden automatisch entfernt. Das neue Skript `backend-cloud/scripts/sync-stats.js` gibt Snapshot-Größen (Median, p90, p99, Maximum), die größten Abschnitte im Snapshot, die Größe der Zeilen-Tabellen und die Konfliktquote der letzten 7 Tage aus, nur Zahlen ohne Inhalte. Start auf dem Server: `docker compose exec streamnet-backend node scripts/sync-stats.js`. Vorher `npm run migrate` ausführen. Nicht geprüft: Lauf gegen die echte Datenbank.

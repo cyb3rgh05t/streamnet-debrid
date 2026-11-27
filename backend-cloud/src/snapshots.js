@@ -56,6 +56,22 @@ export function payloadUpdatedAtMillis(payload) {
   return Number.isSafeInteger(updatedAt) && updatedAt > 0 ? updatedAt : null;
 }
 
+/**
+ * The legacy account-wide `catalogs` list duplicates `catalogsByProfile` (about 40 % of all stored snapshot
+ * data). Apps and the web player read it only for a profile that has no `catalogsByProfile` entry, so it is
+ * dropped once every profile has one. Anything older keeps it. Returns whether it was removed.
+ */
+export function dropRedundantLegacyCatalogs(payload) {
+  if (!payload || typeof payload !== "object" || !Object.hasOwn(payload, "catalogs")) return false;
+  const byProfile = payload.catalogsByProfile;
+  const profiles = Array.isArray(payload.profiles) ? payload.profiles : [];
+  if (!byProfile || typeof byProfile !== "object" || Array.isArray(byProfile) || !profiles.length) return false;
+  const covered = profiles.every((profile) => profile?.id && Array.isArray(byProfile[profile.id]));
+  if (!covered) return false;
+  delete payload.catalogs;
+  return true;
+}
+
 function isPlainObject(value) {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
