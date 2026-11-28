@@ -702,9 +702,9 @@ p {
 }
 
 .tv-channel-logo {
+  position: absolute;
+  inset: 14% 20%;
   display: grid;
-  width: 46%;
-  height: 56%;
 }
 
 .tv-channel-copy {
