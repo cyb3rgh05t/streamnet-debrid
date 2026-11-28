@@ -4,6 +4,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Web 1.0.097] - 2026-11-28
+
+- Web-Player, Startseite: Die Senderlogos der TV-Reihen füllen ihre Fläche jetzt fest aus (absolut positioniert, eingepasst) statt von Prozent-Höhen abzuhängen; dadurch werden auch hohe Logos wie „Sky Atlantic“ vollständig angezeigt. In einer Testseite mit den echten Styles geprüft (hohes Quadrat-Logo bleibt komplett sichtbar und mittig); die Startseite selbst nicht.
+
 ## [Web 1.0.096] - 2026-11-28
 
 - Web-Player, Startseite: Die Senderlogos der TV-Reihen werden jetzt vollständig und mittig in der Karte angezeigt; breite oder hohe Logos wurden unten abgeschnitten.
