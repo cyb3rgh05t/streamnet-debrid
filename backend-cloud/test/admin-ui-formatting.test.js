@@ -81,7 +81,7 @@ test("Remote Config offers only the per-account actions; lists, covers and added
     playlists: ["add_playlist", "edit_playlist", "change_xtream_host", "clear_streamnet_host_override"],
     addons: ["add_addon", "edit_addon"],
     catalogs: [
-      "add_catalog", "rename_catalog",
+      "rename_catalog",
       "clear_catalog_source", "remove_obsolete_catalogs",
     ],
   });

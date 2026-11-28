@@ -730,8 +730,9 @@
               <h3 class="rc-heading">Bei bestehenden Accounts anpassen</h3>
               <p class="rc-intro">
                 Die Einstellungen oben gelten für alle Geräte. Diese Aktionen ändern zusätzlich die gespeicherten
-                Kataloge bereits registrierter Accounts (Titel ändern, Katalog verteilen, aufräumen). Das Ein- und Ausblenden
-                einer Reihe stellst du oben mit dem Schalter ein; er gilt für alle Geräte. Nur Kataloge der App
+                Kataloge bereits registrierter Accounts (Titel ändern, aufräumen). Neue Kataloge legst du oben unter
+                „Zusätzliche Home-Kataloge für alle“ an, und das Ein- und Ausblenden einer Reihe stellst du dort mit dem Schalter ein;
+                beides gilt für alle Geräte. Nur Kataloge der App
                 werden aufgelistet; selbst angelegte Kataloge der Nutzer bleiben unberührt.
               </p>
               <div id="rc-slot-catalogs" class="rc-account-slot"></div>
@@ -817,7 +818,7 @@
 
                 <h3 class="rc-heading">Bei bestehenden Accounts: was die Aktionen tun</h3>
                 <ul>
-                  <li><strong>Home-Kataloge → Katalog an alle Accounts verteilen</strong> – legt einen Katalog bei allen Accounts an oder aktualisiert ihn.</li>
+                  <li><strong>Neue Home-Kataloge</strong> – legst du oben unter „Zusätzliche Home-Kataloge für alle“ an (MDBList-Liste, gilt auch für Neuinstallationen).</li>
                   <li><strong>Katalog umbenennen</strong> – wirkt auf die App-Kataloge in den gespeicherten Accounts. Ein- und Ausblenden einer Reihe geht oben mit dem Schalter und gilt für alle Geräte.</li>
                   <li><strong>Alte Austausche zurücksetzen</strong> – entfernt Listen-Austausche, die früher pro Account gespeichert wurden, damit wieder die zentralen Werte gelten.</li>
                   <li><strong>Veraltetes bereinigen</strong> – entfernt Netzwerk-, Studio- und Featured-Collections, die die aktuelle App nicht mehr ausliefert.</li>
@@ -893,9 +894,6 @@
                       </option>
                       <option value="edit_addon">
                         Vorhandenes Add-on global bearbeiten
-                      </option>
-                      <option value="add_catalog">
-                        Katalog an alle Accounts verteilen (neu / aktualisieren)
                       </option>
                       <option value="rename_catalog">
                         Katalog: Titel bei allen Accounts ändern
@@ -1053,15 +1051,10 @@
                   </div>
                   <div id="global-catalog-fields" class="op-fields hidden">
                     <div class="quick-panel">
-                      Trakt und MDBList per Listen-Link. Eingebaute Kataloge und
-                      Add-on-Kataloge werden aus dem Cloud-Bestand bzw.
-                      installierten Manifesten ausgewählt. Add-on-Kataloge
-                      werden nur Accounts mit dem entsprechenden Add-on
-                      zugeordnet; das Add-on wird nicht automatisch installiert.
-                      Benötigte Anbieter-Verbindungen und API-Schlüssel bleiben
-                      Voraussetzung auf den Geräten. System-/Add-on-Kataloge
-                      werden beim Entfernen dauerhaft ausgeblendet, nicht aus
-                      der App oder dem Manifest gelöscht.
+                      Wirkt auf den ausgewählten Katalog der App in den
+                      gespeicherten Accounts. Eigene Kataloge der Nutzer und
+                      Kataloge, die ein Nutzer selbst hinzugefügt hat, bleiben
+                      unberührt.
                     </div>
                     <label id="global-catalog-type-field"
                       >Quelle<select id="global-catalog-type">
