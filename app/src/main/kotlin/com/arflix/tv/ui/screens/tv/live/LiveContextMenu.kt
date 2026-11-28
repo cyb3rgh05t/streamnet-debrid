@@ -52,70 +52,8 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import com.arflix.tv.R
-
-internal data class LiveMenuEntry(
-    val label: String,
-    val icon: ImageVector,
-    val onClick: () -> Unit,
-)
-
-/**
- * Long-press menu for channels and categories. It lives in its own window so the D-pad keys of the
- * Live TV screen underneath cannot interfere; Back (or a tap outside) dismisses it.
- */
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-internal fun LiveContextMenuDialog(
-    title: String,
-    entries: List<LiveMenuEntry>,
-    onDismiss: () -> Unit,
-) {
-    if (entries.isEmpty()) return
-    val firstFocus = remember { FocusRequester() }
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        LaunchedEffect(Unit) {
-            repeat(5) {
-                if (runCatching { firstFocus.requestFocus() }.isSuccess) return@LaunchedEffect
-                delay(40L)
-            }
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.6f))
-                .pointerInput(Unit) { detectTapGestures(onTap = { onDismiss() }) },
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                modifier = Modifier
-                    .width(320.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(LiveColors.PanelRaised)
-                    .border(1.dp, LiveColors.DividerStrong, RoundedCornerShape(14.dp))
-                    .pointerInput(Unit) { detectTapGestures { } }
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    text = title,
-                    style = LiveType.ChannelName.copy(color = LiveColors.Fg, fontSize = 15.sp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                )
-                entries.forEachIndexed { index, entry ->
-                    LiveContextMenuRow(
-                        entry = entry,
-                        modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
-                    )
-                }
-            }
-        }
-    }
-}
+import com.arflix.tv.ui.components.ArvioMenuDialog
+import com.arflix.tv.ui.components.ArvioMenuEntry
 
 /** Long-press menu of a channel: favorite, source, position in its category and hide/unhide. */
 @Composable
@@ -135,7 +73,7 @@ internal fun ChannelContextMenu(
     onToggleHidden: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    fun entry(label: String, icon: ImageVector, action: () -> Unit) = LiveMenuEntry(label, icon) {
+    fun entry(label: String, icon: ImageVector, action: () -> Unit) = ArvioMenuEntry(label, icon) {
         onDismiss()
         action()
     }
@@ -166,45 +104,5 @@ internal fun ChannelContextMenu(
             add(entry(stringResource(R.string.live_menu_hide_channel), Icons.Filled.VisibilityOff, onToggleHidden))
         }
     }
-    LiveContextMenuDialog(title = channel.name, entries = entries, onDismiss = onDismiss)
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun LiveContextMenuRow(
-    entry: LiveMenuEntry,
-    modifier: Modifier = Modifier,
-) {
-    var focused by remember { mutableStateOf(false) }
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(42.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (focused) LiveColors.Panel else LiveColors.PanelDeep)
-            .border(
-                width = if (focused) 2.dp else 1.dp,
-                color = if (focused) LiveColors.FocusRing else LiveColors.Divider,
-                shape = RoundedCornerShape(10.dp),
-            )
-            .onFocusChanged { focused = it.hasFocus }
-            // clickable is already focusable; a second focus target made the first click only move focus.
-            .clickable(onClick = entry.onClick)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(
-            imageVector = entry.icon,
-            contentDescription = null,
-            tint = if (focused) LiveColors.Accent else LiveColors.FgDim,
-            modifier = Modifier.size(18.dp),
-        )
-        Text(
-            text = entry.label,
-            style = LiveType.CellTitle.copy(color = if (focused) LiveColors.Fg else LiveColors.FgDim, fontSize = 13.sp),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
+    ArvioMenuDialog(title = channel.name, entries = entries, onDismiss = onDismiss)
 }

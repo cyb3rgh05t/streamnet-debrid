@@ -86,6 +86,8 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import com.arflix.tv.R
+import com.arflix.tv.ui.components.ArvioMenuDialog
+import com.arflix.tv.ui.components.ArvioMenuEntry
 import com.arflix.tv.data.model.IptvNowNext
 import com.arflix.tv.data.model.IptvProgram
 import com.arflix.tv.ui.components.LoadingIndicator
@@ -799,32 +801,32 @@ private fun NetflixCategoryChipRow(
             val playlistId = target.playlistId
             val entries = if (target.hidden) {
                 listOf(
-                    LiveMenuEntry(stringResource(R.string.live_menu_unhide_category), Icons.Filled.Visibility) {
+                    ArvioMenuEntry(stringResource(R.string.live_menu_unhide_category), Icons.Filled.Visibility) {
                         menuItem = null
                         onUnhideCategory(playlistId, groupName)
                     },
                 )
             } else {
                 listOf(
-                    LiveMenuEntry(stringResource(R.string.live_menu_move_start), Icons.Filled.KeyboardArrowLeft) {
+                    ArvioMenuEntry(stringResource(R.string.live_menu_move_start), Icons.Filled.KeyboardArrowLeft) {
                         menuItem = null
                         onMoveCategoryToTop(playlistId, groupName)
                     },
-                    LiveMenuEntry(stringResource(R.string.live_menu_move_left), Icons.Filled.KeyboardArrowLeft) {
+                    ArvioMenuEntry(stringResource(R.string.live_menu_move_left), Icons.Filled.KeyboardArrowLeft) {
                         menuItem = null
                         onMoveCategoryUp(playlistId, groupName)
                     },
-                    LiveMenuEntry(stringResource(R.string.live_menu_move_right), Icons.Filled.KeyboardArrowRight) {
+                    ArvioMenuEntry(stringResource(R.string.live_menu_move_right), Icons.Filled.KeyboardArrowRight) {
                         menuItem = null
                         onMoveCategoryDown(playlistId, groupName)
                     },
-                    LiveMenuEntry(stringResource(R.string.live_menu_hide_category), Icons.Filled.VisibilityOff) {
+                    ArvioMenuEntry(stringResource(R.string.live_menu_hide_category), Icons.Filled.VisibilityOff) {
                         menuItem = null
                         onHideCategory(playlistId, groupName)
                     },
                 )
             }
-            LiveContextMenuDialog(
+            ArvioMenuDialog(
                 title = target.label,
                 entries = entries,
                 onDismiss = { menuItem = null },

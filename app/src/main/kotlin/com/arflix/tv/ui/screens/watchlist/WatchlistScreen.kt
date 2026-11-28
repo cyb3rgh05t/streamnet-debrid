@@ -228,7 +228,9 @@ fun WatchlistScreen(
     com.arflix.tv.ui.components.PreserveTopBarFocus(
         sidebarFocusIndex, hasProfile, hasOfflineDownloads
     ) { sidebarFocusIndex = it }
-    var focusZone by remember { mutableStateOf(WatchlistFocusZone.CONTENT) }
+    var focusZone by remember { mutableStateOf(if (isMobile) WatchlistFocusZone.CONTENT else WatchlistFocusZone.TOP_BAR) }
+    // Entry focus is decided once the lists are known and stops as soon as the user moves.
+    var entryFocusLocked by remember { mutableStateOf(false) }
     var providerFocusIndex by remember { mutableIntStateOf(0) }
     var libraryFocusIndex by remember { mutableIntStateOf(0) }
     var filterFocusIndex by remember { mutableIntStateOf(0) }
@@ -425,6 +427,20 @@ fun WatchlistScreen(
     }
 
     LaunchedEffect(Unit) { rootFocusRequester.requestFocus() }
+    // Nothing saved and no other source: stay on the navigation. A connected home server or tracker
+    // puts the focus on the source tabs, otherwise it jumps to the first saved item.
+    LaunchedEffect(uiState.isLoading, providers.size, watchlistTotal, entryFocusLocked) {
+        if (entryFocusLocked || isMobile || uiState.isLoading) return@LaunchedEffect
+        when {
+            providers.size > 1 -> focusZone = WatchlistFocusZone.PROVIDERS
+            watchlistTotal > 0 -> {
+                focusedSectionIndex = 0
+                focusedItemIndex = 0
+                focusZone = WatchlistFocusZone.CONTENT
+            }
+            else -> focusZone = WatchlistFocusZone.TOP_BAR
+        }
+    }
     LaunchedEffect(providers.map { it.id }) {
         if (providers.none { it.id == selectedProviderId }) {
             selectedProviderId = WATCHLIST_PROVIDER_ID
@@ -512,6 +528,7 @@ fun WatchlistScreen(
                     }
                 }
                 if (event.type == KeyEventType.KeyDown) {
+                    entryFocusLocked = true
                     when (effectiveKey) {
                         Key.Back, Key.Escape -> {
                             if (focusZone == WatchlistFocusZone.TOP_BAR) onBack() else focusZone = WatchlistFocusZone.TOP_BAR

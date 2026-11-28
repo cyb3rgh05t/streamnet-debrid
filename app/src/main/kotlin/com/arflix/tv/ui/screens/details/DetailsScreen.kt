@@ -734,14 +734,25 @@ fun DetailsScreen(
                         }
                         Key.Enter, Key.DirectionCenter -> {
                             if (!isSidebarFocused && focusedSection == FocusSection.SEASONS) {
+                                val nowMs = SystemClock.elapsedRealtime()
                                 if (seasonSelectDownAtMs == 0L) {
-                                    seasonSelectDownAtMs = SystemClock.elapsedRealtime()
+                                    seasonSelectDownAtMs = nowMs
+                                } else if (event.nativeKeyEvent.repeatCount > 0 && nowMs - seasonSelectDownAtMs >= 500L) {
+                                    // Held OK opens the menu right away instead of waiting for the release.
+                                    seasonSelectDownAtMs = 0L
+                                    contextMenuSeason = seasonIndex + 1
+                                    showSeasonContextMenu = true
                                 }
                                 return@onPreviewKeyEvent true
                             }
                             if (!isSidebarFocused && focusedSection == FocusSection.EPISODES) {
+                                val nowMs = SystemClock.elapsedRealtime()
                                 if (episodeSelectDownAtMs == 0L) {
-                                    episodeSelectDownAtMs = SystemClock.elapsedRealtime()
+                                    episodeSelectDownAtMs = nowMs
+                                } else if (event.nativeKeyEvent.repeatCount > 0 && nowMs - episodeSelectDownAtMs >= 500L) {
+                                    episodeSelectDownAtMs = 0L
+                                    contextMenuEpisode = uiState.episodes.getOrNull(episodeIndex)
+                                    showEpisodeContextMenu = contextMenuEpisode != null
                                 }
                                 return@onPreviewKeyEvent true
                             }
@@ -877,7 +888,7 @@ fun DetailsScreen(
                         val heldMs = SystemClock.elapsedRealtime() - episodeSelectDownAtMs
                         episodeSelectDownAtMs = 0L
                         val ep = uiState.episodes.getOrNull(episodeIndex)
-                        if (ep != null && heldMs >= 900L) {
+                        if (ep != null && heldMs >= 500L) {
                             contextMenuEpisode = ep
                             showEpisodeContextMenu = true
                         } else if (ep != null) {
@@ -895,7 +906,7 @@ fun DetailsScreen(
                     } else if (!isSidebarFocused && focusedSection == FocusSection.SEASONS && seasonSelectDownAtMs > 0L) {
                         val heldMs = SystemClock.elapsedRealtime() - seasonSelectDownAtMs
                         seasonSelectDownAtMs = 0L
-                        if (heldMs >= 900L) {
+                        if (heldMs >= 500L) {
                             contextMenuSeason = seasonIndex + 1
                             showSeasonContextMenu = true
                         } else {

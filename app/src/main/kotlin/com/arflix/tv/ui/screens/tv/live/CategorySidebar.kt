@@ -82,6 +82,8 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import com.arflix.tv.R
+import com.arflix.tv.ui.components.ArvioMenuDialog
+import com.arflix.tv.ui.components.ArvioMenuEntry
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -506,10 +508,10 @@ fun CategorySidebar(
             }
         }
         if (currentMenu != null && activeMenuActions.isNotEmpty()) {
-            LiveContextMenuDialog(
+            ArvioMenuDialog(
                 title = currentMenu.groupName,
                 entries = activeMenuActions.map { action ->
-                    LiveMenuEntry(stringResource(action.labelRes), action.icon, action.onClick)
+                    ArvioMenuEntry(stringResource(action.labelRes), action.icon, action.onClick)
                 },
                 onDismiss = { activeMenu = null },
             )

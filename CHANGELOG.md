@@ -4,8 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.037] - 2026-11-28
+
+- Android, Menüs bei langem Druck: Alle Aktionsmenüs (Startseite, Serien-Details mit Folgen und Staffeln, Merkliste, Live TV) nutzen jetzt denselben Dialog im neuen Stil, mit zentriertem Titel (und bei Folgen/Staffeln/Filmen der Zeile darunter). Vorher gab es je Bildschirm eine eigene Variante. In den Serien-Details öffnet sich das Menü auf dem TV jetzt schon nach etwa 0,5 Sekunden gehaltenem OK (vorher erst beim Loslassen nach 0,9 Sekunden), die Menütaste funktioniert weiter. Auf dem Handy sind die Menüs jetzt ebenfalls dieser Dialog statt des Bottom-Sheets.
 - Android TV, Merkliste: Beim Öffnen liegt der Fokus jetzt je nach Inhalt richtig: Ist nichts gespeichert und gibt es keine weitere Quelle, bleibt er auf der Navigation oben. Ist etwas gespeichert, springt er auf das erste Element. Ist ein Heimserver (oder Trakt/Simkl) verbunden, liegt er auf den Tabs. Sobald du eine Taste drückst, ändert sich der Fokus nicht mehr von selbst. Kompiliert; nicht auf einem Gerät geprüft.
 
+## [Web 1.0.095] - 2026-11-28
+
+- Web-Player, Startseite: Die Senderlogos der TV-Reihen sitzen jetzt mittig in der Karte statt oben.
 ## [Web 1.0.094] - 2026-11-28
 
 - Web-Player, Startseite: „TV-Favoriten“ und „Zuletzt gesehene Sender“ erscheinen jetzt auch im Web als Reihen auf der Startseite (vorher gab es sie nur in den Katalog-Einstellungen). Sie folgen dem Schalter und der Position aus den Katalog-Einstellungen, zeigen Logo, Sendernamen und die laufende Sendung (bis zu 30 Sender, ausgeblendete Sender fehlen) und spielen den Sender beim Klick ab. Ohne gespeicherte Sender oder Playlist bleibt die Reihe weg; die Senderliste wird dafür bei Bedarf im Hintergrund geladen.
