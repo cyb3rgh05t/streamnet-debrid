@@ -1,6 +1,7 @@
 package com.arflix.tv.data.repository
 
 import com.arflix.tv.data.model.CatalogKind
+import com.arflix.tv.data.model.CatalogSourceType
 import com.arflix.tv.data.model.CollectionSourceConfig
 import com.arflix.tv.data.model.CollectionSourceKind
 import com.arflix.tv.ui.screens.collections.CollectionTab
@@ -155,6 +156,39 @@ class CatalogConfigRepositoryTest {
         assertEquals("mdblist:https://mdblist.com/lists/snoak/top-horror", row.sourceRef)
         assertTrue(row.isPreinstalled)
         assertEquals(defaults.size - 2 + 2, result.size)
+    }
+
+    @Test
+    fun `home rows can come from a Trakt list, rows without a source stay MDBList and unknown sources are dropped`() {
+        val parsed = CatalogConfigRepository.parseCatalogConfig(
+            """{"franchises":[],"overrides":{
+                "newRows":[
+                  {"id":"old-row","title":"Old","url":"https://mdblist.com/lists/me/old"},
+                  {"id":"mdb-row","title":"Mdb","url":"https://mdblist.com/lists/me/mdb","source":"mdblist"},
+                  {"id":"trakt-user","title":"Trakt User","url":"https://trakt.tv/users/justin/lists/top-horror","source":"trakt","after":"mdb-row"},
+                  {"id":"trakt-id","title":"Trakt Id","url":"https://trakt.tv/lists/2142753","source":"trakt"},
+                  {"id":"trakt-wrong","title":"Wrong","url":"https://mdblist.com/lists/me/x","source":"trakt"},
+                  {"id":"trakt-movies","title":"Movies page","url":"https://trakt.tv/movies/trending","source":"trakt"},
+                  {"id":"mdb-wrong","title":"Wrong too","url":"https://trakt.tv/users/a/lists/b","source":"mdblist"},
+                  {"id":"addon-row","title":"Addon","url":"https://mdblist.com/lists/me/a","source":"addon"}]}}"""
+        )!!
+        assertEquals(
+            listOf("old-row", "mdb-row", "trakt-user", "trakt-id"),
+            parsed.overrides.newRows.map { it.id }
+        )
+        assertEquals(
+            listOf(CentralRowSource.MDBLIST, CentralRowSource.MDBLIST, CentralRowSource.TRAKT, CentralRowSource.TRAKT),
+            parsed.overrides.newRows.map { it.source }
+        )
+
+        val result = CatalogConfigRepository.applyCentralConfig(defaults, parsed)
+        val user = result.single { it.id == "central_row_trakt_user" }
+        assertEquals(CatalogSourceType.TRAKT, user.sourceType)
+        assertEquals("https://trakt.tv/users/justin/lists/top-horror", user.sourceUrl)
+        assertEquals("trakt_user:justin:top-horror", user.sourceRef)
+        assertTrue(user.isPreinstalled)
+        assertEquals("trakt_list:2142753", result.single { it.id == "central_row_trakt_id" }.sourceRef)
+        assertTrue(result.indexOfFirst { it.id == "central_row_trakt_user" } == result.indexOfFirst { it.id == "central_row_mdb_row" } + 1)
     }
 
     @Test

@@ -2857,7 +2857,7 @@ function renderRcOverview() {
   }
   for (const catalogId of overrides.hidden || []) rows.push([rcStandardTitle(catalogId), "Home-Katalog", "Für alle Geräte ausgeblendet", standardsTab]);
   for (const row of overrides.newRows || []) {
-    rows.push([row.title, "Zusätzlicher Home-Katalog", `MDBList-Liste ${rcNormalizeSlug(row.url) || row.url}`, standardsTab]);
+    rows.push([row.title, "Zusätzlicher Home-Katalog", `${row.source === "trakt" ? "Trakt-Liste" : "MDBList-Liste"} ${rcRowListLabel(row)}`, standardsTab]);
   }
   for (const [catalogId, url] of Object.entries(overrides.covers || {})) rows.push([rcStandardTitle(catalogId), "Cover", url, catalogId]);
   for (const [catalogId, url] of Object.entries(overrides.intros || {})) rows.push([rcStandardTitle(catalogId), "Intro-Video", url, catalogId]);
@@ -2966,6 +2966,27 @@ function stashRcDraft() {
 function rcNormalizeSlug(value) {
   const slug = String(value || "").trim().replace(/^https?:\/\/(www\.)?mdblist\.com\/lists\//i, "").replace(/\/+(json)?$/, "");
   return /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(slug) ? slug : "";
+}
+
+// The canonical https://trakt.tv link of a pasted Trakt list (trakt.tv/users/{user}/lists/{list} or trakt.tv/lists/{id}); empty otherwise.
+function rcNormalizeTraktUrl(value) {
+  try {
+    const raw = String(value || "").trim();
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    const host = url.hostname.toLowerCase();
+    if (host !== "trakt.tv" && !host.endsWith(".trakt.tv")) return "";
+    const parts = url.pathname.split("/").filter(Boolean);
+    const valid = (parts.length === 4 && parts[0] === "users" && parts[2] === "lists") ||
+      (parts.length === 2 && parts[0] === "lists" && /^\d+$/.test(parts[1]));
+    return valid ? `https://trakt.tv/${parts.join("/")}` : "";
+  } catch {
+    return "";
+  }
+}
+
+// What an added Home row shows as its list name: the MDBList slug or the Trakt path.
+function rcRowListLabel(row) {
+  return row.source === "trakt" ? new URL(row.url).pathname.replace(/^\//, "") : rcNormalizeSlug(row.url) || row.url;
 }
 
 function rcListBadge(info) {
@@ -3534,8 +3555,9 @@ function refreshRcRowInfo() {
 
 function renderRcNewRows() {
   byId("rc-newrows").replaceChildren(...rc.newRows.map((row, index) => {
-    const slug = rcNormalizeSlug(row.url);
-    const [badge, badgeClass] = rcListBadge(rc.listInfo[slug]);
+    const isTrakt = row.source === "trakt";
+    const slug = isTrakt ? "" : rcNormalizeSlug(row.url);
+    const [badge, badgeClass] = isTrakt ? ["Trakt", ""] : rcListBadge(rc.listInfo[slug]);
     const line = rcElement("div", null, "rc-newrow");
     const title = document.createElement("input");
     title.value = row.title;
@@ -3544,9 +3566,15 @@ function renderRcNewRows() {
     const url = document.createElement("input");
     url.value = row.url;
     url.addEventListener("change", () => {
-      const clean = rcNormalizeSlug(url.value);
-      if (!clean) { showToast("MDBList: user/liste oder ein mdblist.com-Link", true); renderRcNewRows(); return; }
-      row.url = `https://mdblist.com/lists/${clean}`;
+      if (isTrakt) {
+        const clean = rcNormalizeTraktUrl(url.value);
+        if (!clean) { showToast("Trakt: ein Link wie trakt.tv/users/name/lists/liste", true); renderRcNewRows(); return; }
+        row.url = clean;
+      } else {
+        const clean = rcNormalizeSlug(url.value);
+        if (!clean) { showToast("MDBList: user/liste oder ein mdblist.com-Link", true); renderRcNewRows(); return; }
+        row.url = `https://mdblist.com/lists/${clean}`;
+      }
       renderRcNewRows();
     });
     const remove = document.createElement("button");
@@ -3556,27 +3584,47 @@ function renderRcNewRows() {
     remove.addEventListener("click", () => { rc.newRows.splice(index, 1); renderRcNewRows(); });
     const anchor = rcStandard(row.after)?.title ?? rc.newRows.find((other) => other.id === row.after)?.title;
     const position = row.after && anchor ? `nach ${anchor}` : "am Ende";
+    const info = isTrakt ? "Filme und Serien der Trakt-Liste" : rcListInfoText(rc.listInfo[slug]);
     line.append(
       rcElement("span", badge, `rc-badge ${badgeClass}`.trim()), title, url,
-      rcElement("span", `${rcListInfoText(rc.listInfo[slug])} · ${position}`, "rc-source-info"), remove,
+      rcElement("span", `${info} · ${position}`, "rc-source-info"), remove,
     );
     return line;
   }));
-  void loadRcListInfo(rc.newRows.map((row) => rcNormalizeSlug(row.url)).filter(Boolean).filter((slug) => !(slug in rc.listInfo)));
+  void loadRcListInfo(rc.newRows.filter((row) => row.source !== "trakt").map((row) => rcNormalizeSlug(row.url)).filter(Boolean).filter((slug) => !(slug in rc.listInfo)));
 }
 
 function addRcNewRow() {
   const title = byId("rc-nr-title").value.trim();
-  const slug = rcNormalizeSlug(byId("rc-nr-url").value);
+  const source = byId("rc-nr-source").value === "trakt" ? "trakt" : "mdblist";
+  const slug = source === "mdblist" ? rcNormalizeSlug(byId("rc-nr-url").value) : "";
+  const traktUrl = source === "trakt" ? rcNormalizeTraktUrl(byId("rc-nr-url").value) : "";
   if (title.length < 2) { showToast("Titel: mindestens 2 Zeichen", true); return; }
-  if (!slug) { showToast("MDBList: user/liste oder ein mdblist.com-Link", true); return; }
+  if (source === "mdblist" && !slug) { showToast("MDBList: user/liste oder ein mdblist.com-Link", true); return; }
+  if (source === "trakt" && !traktUrl) { showToast("Trakt: ein Link wie trakt.tv/users/name/lists/liste", true); return; }
   let id = rcRowIdFor(title);
   if (id.length < 3) id = `${id}-reihe`.replace(/^-/, "");
   const base = id;
   for (let n = 2; rc.newRows.some((row) => row.id === id); n += 1) id = `${base}-${n}`;
-  rc.newRows.push({ id, title, url: `https://mdblist.com/lists/${slug}`, mediaType: byId("rc-nr-type").value, after: byId("rc-nr-after").value });
+  rc.newRows.push({
+    id, title, source,
+    url: source === "trakt" ? traktUrl : `https://mdblist.com/lists/${slug}`,
+    mediaType: source === "mdblist" ? byId("rc-nr-type").value : "",
+    after: byId("rc-nr-after").value,
+  });
   for (const field of ["rc-nr-title", "rc-nr-url"]) byId(field).value = "";
   renderRcNewRows();
+}
+
+// The form follows the chosen source: Trakt lists hold movies and shows together, so the type choice goes away.
+function updateRcNewRowSource() {
+  const trakt = byId("rc-nr-source").value === "trakt";
+  byId("rc-nr-url-label").textContent = trakt ? "Trakt-Liste" : "MDBList-Liste";
+  byId("rc-nr-url").placeholder = trakt
+    ? "https://trakt.tv/users/name/lists/liste"
+    : "user/liste oder https://mdblist.com/lists/user/liste";
+  byId("rc-nr-type-field").classList.toggle("hidden", trakt);
+  byId("rc-newrow-form").classList.toggle("is-trakt", trakt);
 }
 
 async function saveRcStandards(event) {
@@ -3589,7 +3637,7 @@ async function saveRcStandards(event) {
       if (value && value !== input.dataset.rcDefault) rows[input.dataset.rcRow] = value;
     });
     const hidden = [...document.querySelectorAll("[data-rc-show]")].filter((box) => !box.checked).map((box) => box.dataset.rcShow);
-    const newRows = rc.newRows.map((row) => ({ id: row.id, title: row.title, url: row.url, mediaType: row.mediaType || "", after: row.after || "" }));
+    const newRows = rc.newRows.map((row) => ({ id: row.id, title: row.title, url: row.url, mediaType: row.mediaType || "", after: row.after || "", source: row.source || "mdblist" }));
     setMessage(message, "Wird gespeichert…", "info");
     await api("/admin-api/catalog-config/overrides", {
       method: "PUT",
@@ -3651,6 +3699,7 @@ byId("rc-f-reset").addEventListener("click", removeRcFranchise);
 byId("rc-f-delete").addEventListener("click", removeRcFranchise);
 byId("rc-standards-form").addEventListener("submit", saveRcStandards);
 byId("rc-nr-add").addEventListener("click", addRcNewRow);
+byId("rc-nr-source").addEventListener("change", updateRcNewRowSource);
 
 // Only what ships with the app is listed; add-ons, playlists and catalogs users installed themselves stay out.
 const appOwnedAddonIds = new Set(["opensubtitles"]);

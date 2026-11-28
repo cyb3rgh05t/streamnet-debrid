@@ -1,6 +1,6 @@
 import { config, hasCloudBackendConfig } from "./config";
 import { jsonRequest } from "./http";
-import { applyCentralOverrides, isValidRemoteMdblistUrl, type CentralSources } from "./catalogRemoteOverrides";
+import { applyCentralOverrides, isValidRemoteMdblistUrl, isValidRemoteTraktUrl, type CentralSources } from "./catalogRemoteOverrides";
 import {
   bundledFranchiseLists,
   type FranchiseEntry,
@@ -33,8 +33,15 @@ export type RemoteFranchise = {
 
 export const centralRowPrefix = "central_row_";
 
-/** A Home row the admin added for everyone: an MDBList list, optionally placed after another row. */
-export type CentralRow = { id: string; title: string; url: string; mediaType: "movie" | "tv" | ""; after: string };
+/** A Home row the admin added for everyone: an MDBList or Trakt list, optionally placed after another row. */
+export type CentralRow = {
+  id: string;
+  title: string;
+  url: string;
+  mediaType: "movie" | "tv" | "";
+  after: string;
+  source: "mdblist" | "trakt";
+};
 
 export type CentralCollectionGroup = "SERVICE" | "DECADE";
 
@@ -260,13 +267,18 @@ function parseRows(value: unknown): CentralRow[] {
     const id = String(raw?.id ?? "").trim();
     const title = String(raw?.title ?? "").trim().slice(0, 120);
     const url = String(raw?.url ?? "").trim();
-    if (!idPattern.test(id) || !title || !isValidRemoteMdblistUrl(url)) continue;
+    // No `source` means MDBList (older backends); a source this build does not know drops the row.
+    const source = raw?.source === undefined || raw?.source === null || raw?.source === "" ? "mdblist" : String(raw.source).toLowerCase();
+    if (source !== "mdblist" && source !== "trakt") continue;
+    const validUrl = source === "trakt" ? isValidRemoteTraktUrl(url) : isValidRemoteMdblistUrl(url);
+    if (!idPattern.test(id) || !title || !validUrl) continue;
     rows.push({
       id,
       title,
       url,
-      mediaType: raw?.mediaType === "movie" || raw?.mediaType === "tv" ? raw.mediaType : "",
+      mediaType: source === "mdblist" && (raw?.mediaType === "movie" || raw?.mediaType === "tv") ? raw.mediaType : "",
       after: String(raw?.after ?? "").trim(),
+      source,
     });
   }
   return rows.slice(0, 20);
@@ -404,23 +416,40 @@ function centralRowId(row: CentralRow) {
   return centralRowPrefix + row.id.replace(/-/g, "_");
 }
 
+/** The reference the apps store for a Trakt list (trakt_user:{user}:{list} or trakt_list:{id}). */
+function traktSourceRef(url: string) {
+  const parts = new URL(url).pathname.split("/").filter(Boolean);
+  return parts[0] === "users" ? `trakt_user:${parts[1]}:${parts[3]}` : `trakt_list:${parts[1]}`;
+}
+
 /** Adds the rows the admin created, each after the row it names (or at the end). */
 function withCentralRows(catalogs: CatalogConfig[], rows: CentralRow[]): CatalogConfig[] {
   const result = [...catalogs];
   for (const row of rows) {
     const id = centralRowId(row);
     if (result.some((catalog) => catalog.id === id)) continue;
-    const added: CatalogConfig = {
-      id,
-      name: row.title,
-      title: row.title,
-      sourceType: "mdblist",
-      mediaType: row.mediaType || undefined,
-      sourceUrl: row.url,
-      sourceRef: `mdblist:${row.url}`,
-      enabled: true,
-      isPreinstalled: true,
-    };
+    const added: CatalogConfig = row.source === "trakt"
+      ? {
+          id,
+          name: row.title,
+          title: row.title,
+          sourceType: "trakt",
+          sourceUrl: row.url,
+          sourceRef: traktSourceRef(row.url),
+          enabled: true,
+          isPreinstalled: true,
+        }
+      : {
+          id,
+          name: row.title,
+          title: row.title,
+          sourceType: "mdblist",
+          mediaType: row.mediaType || undefined,
+          sourceUrl: row.url,
+          sourceRef: `mdblist:${row.url}`,
+          enabled: true,
+          isPreinstalled: true,
+        };
     const anchor = result.findIndex((catalog) => catalog.id === row.after || catalog.id === centralRowPrefix + row.after.replace(/-/g, "_"));
     if (row.after && anchor >= 0) result.splice(anchor + 1, 0, added);
     else result.push(added);

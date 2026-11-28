@@ -22,7 +22,18 @@ const maxExtraRefs = 30;
 const maxNewRows = 20;
 const maxNewCollections = 20;
 const newCollectionGroups = ["SERVICE", "DECADE"];
+const newRowSources = ["mdblist", "trakt"];
 const customIdPattern = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
+
+/** The canonical https://trakt.tv link of a list (trakt.tv/users/{user}/lists/{list} or trakt.tv/lists/{id}); throws otherwise. */
+export function cleanTraktRowUrl(raw) {
+  const { sourceUrl } = normalizeAdminListUrl("TRAKT", raw);
+  const url = new URL(sourceUrl);
+  url.protocol = "https:";
+  url.hostname = "trakt.tv";
+  url.port = "";
+  return url.toString();
+}
 
 let cached = null;
 async function loadStatic() {
@@ -219,7 +230,7 @@ export function validateOverrides(body, standards) {
   const hiddenable = new Set(standards.filter((s) => s.kind === "STANDARD" || s.kind === "COLLECTION_RAIL").map((s) => s.id));
   const hidden = [...new Set((Array.isArray(body?.hidden) ? body.hidden : []).map((id) => String(id)))];
   for (const id of hidden) if (!hiddenable.has(id)) throw fail(`Unknown home row: ${id.slice(0, 40)}`);
-  // Rows the admin adds for everyone; each is an MDBList list shown on Home.
+  // Rows the admin adds for everyone: an MDBList or Trakt list shown on Home. Rows without a `source` are MDBList.
   const newRowsInput = Array.isArray(body?.newRows) ? body.newRows : [];
   if (newRowsInput.length > maxNewRows) throw fail(`At most ${maxNewRows} added rows`);
   const seenRows = new Set();
@@ -230,13 +241,20 @@ export function validateOverrides(body, standards) {
     seenRows.add(id);
     const title = String(row?.title ?? "").replace(/[\u0000-\u001f]/g, " ").trim();
     if (title.length < 2 || title.length > 60) throw fail("Row title needs 2 to 60 characters");
+    if (row?.source !== undefined && !newRowSources.includes(row.source)) throw fail(`Row "${title.slice(0, 30)}": unknown list source`);
+    const source = row?.source ?? "mdblist";
     const raw = String(row?.url ?? "").trim();
     let url;
-    try { url = normalizeAdminListUrl("MDBLIST", mdblistSlugPattern.test(raw) ? `https://mdblist.com/lists/${raw}` : raw).sourceUrl; } catch { throw fail(`Row "${title.slice(0, 30)}": the list is not an MDBList link`); }
-    const mediaType = ["movie", "tv"].includes(row?.mediaType) ? row.mediaType : "";
+    try {
+      url = source === "trakt"
+        ? cleanTraktRowUrl(raw)
+        : normalizeAdminListUrl("MDBLIST", mdblistSlugPattern.test(raw) ? `https://mdblist.com/lists/${raw}` : raw).sourceUrl;
+    } catch { throw fail(`Row "${title.slice(0, 30)}": the list is not ${source === "trakt" ? "a Trakt" : "an MDBList"} link`); }
+    // Trakt lists hold movies and shows together; the type only narrows an MDBList list.
+    const mediaType = source === "mdblist" && ["movie", "tv"].includes(row?.mediaType) ? row.mediaType : "";
     const after = String(row?.after ?? "").trim();
     if (after && !byId.has(after) && !newRowsInput.some((other) => String(other?.id ?? "").trim().toLowerCase() === after)) throw fail(`Unknown row to place after: ${after.slice(0, 40)}`);
-    return { id, title, url, mediaType, after };
+    return { id, title, url, mediaType, after, source };
   });
   // Collections the admin adds for everyone: a streaming service (TMDB watch providers and/or MDBList lists) or a decade (MDBList lists).
   const newCollectionsInput = Array.isArray(body?.newCollections) ? body.newCollections : [];

@@ -23,6 +23,19 @@ internal fun isValidRemoteMdblistUrl(url: String?): Boolean {
     return parts.size == 3 && parts[0] == "lists"
 }
 
+/** Trakt list URL as the admin writes it: https://trakt.tv/users/{user}/lists/{list} or https://trakt.tv/lists/{id}. */
+internal fun isValidRemoteTraktUrl(url: String?): Boolean {
+    val value = url?.trim().orEmpty()
+    if (value.isEmpty()) return false
+    val uri = runCatching { URI(value) }.getOrNull() ?: return false
+    val host = uri.host?.lowercase() ?: return false
+    if (uri.scheme?.lowercase() != "https" || uri.userInfo != null) return false
+    if (host != "trakt.tv" && !host.endsWith(".trakt.tv")) return false
+    val parts = uri.path.orEmpty().split('/').filter { it.isNotBlank() }
+    return (parts.size == 4 && parts[0] == "users" && parts[2] == "lists") ||
+        (parts.size == 2 && parts[0] == "lists" && parts[1].all { it.isDigit() })
+}
+
 /**
  * Applies the admin overrides of a stored catalog to its bundled definition. The bundled catalog
  * stays the source of truth for everything except the title, the enabled flag, the list URL of an

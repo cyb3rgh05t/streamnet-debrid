@@ -25,6 +25,25 @@ export function isValidRemoteMdblistUrl(value: unknown) {
   }
 }
 
+/** https://trakt.tv/users/{user}/lists/{list} or https://trakt.tv/lists/{id}, as the admin writes it. */
+export function isValidRemoteTraktUrl(value: unknown) {
+  try {
+    const url = new URL(String(value ?? "").trim());
+    const host = url.hostname.toLowerCase();
+    const parts = url.pathname.split("/").filter(Boolean);
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      (host === "trakt.tv" || host.endsWith(".trakt.tv")) &&
+      ((parts.length === 4 && parts[0] === "users" && parts[2] === "lists") ||
+        (parts.length === 2 && parts[0] === "lists" && /^\d+$/.test(parts[1])))
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isPlainHttps(value: string) {
   try {
     const url = new URL(value);

@@ -610,6 +610,29 @@ test("home rows can be hidden for everyone and added with a position, and saved 
   assert.equal(mergeCatalogs(saved).some((catalog) => catalog.id === "central_row_old"), false);
 });
 
+test("home rows can come from a Trakt list; rows without a source stay MDBList and unknown or mismatched sources are dropped", async () => {
+  const { defaultCatalogs } = await import(moduleUrl);
+  const { applyCentralConfig, parseCatalogConfig } = await import(pathToFileURL(path.resolve(__dirname, "../lib/catalogConfig.ts")).href);
+  const central = parseCatalogConfig({ franchises: [], overrides: { newRows: [
+    { id: "old-row", title: "Old", url: "https://mdblist.com/lists/me/old" },
+    { id: "trakt-user", title: "Trakt User", url: "https://trakt.tv/users/justin/lists/top-horror", source: "trakt", mediaType: "movie", after: "old-row" },
+    { id: "trakt-id", title: "Trakt Id", url: "https://trakt.tv/lists/2142753", source: "trakt" },
+    { id: "trakt-wrong", title: "Wrong", url: "https://mdblist.com/lists/me/x", source: "trakt" },
+    { id: "trakt-movies", title: "Movies page", url: "https://trakt.tv/movies/trending", source: "trakt" },
+    { id: "mdb-wrong", title: "Wrong too", url: "https://trakt.tv/users/a/lists/b", source: "mdblist" },
+    { id: "addon-row", title: "Addon", url: "https://mdblist.com/lists/me/a", source: "addon" },
+  ] } });
+  assert.deepEqual(central.overrides.newRows.map((row) => [row.id, row.source]), [["old-row", "mdblist"], ["trakt-user", "trakt"], ["trakt-id", "trakt"]]);
+  assert.equal(central.overrides.newRows[1].mediaType, "");
+  const result = applyCentralConfig(defaultCatalogs, central);
+  const user = result.find((catalog) => catalog.id === "central_row_trakt_user");
+  assert.equal(user.sourceType, "trakt");
+  assert.equal(user.sourceUrl, "https://trakt.tv/users/justin/lists/top-horror");
+  assert.equal(user.sourceRef, "trakt_user:justin:top-horror");
+  assert.equal(result.find((catalog) => catalog.id === "central_row_trakt_id").sourceRef, "trakt_list:2142753");
+  assert.equal(result.findIndex((catalog) => catalog.id === "central_row_trakt_user"), result.findIndex((catalog) => catalog.id === "central_row_old_row") + 1);
+});
+
 test("services are added behind the last service and collections can get another name, intro and cover", async () => {
   const { defaultCatalogs } = await import(moduleUrl);
   const { applyCentralConfig, parseCatalogConfig } = await import(pathToFileURL(path.resolve(__dirname, "../lib/catalogConfig.ts")).href);

@@ -2777,10 +2777,14 @@ tbody tr[data-account-id]:focus .account-primary {
 }
 .rc-newrow-form {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) minmax(180px, 2fr) 120px minmax(160px, 1fr) auto;
+  grid-template-columns: 130px minmax(140px, 1fr) minmax(180px, 2fr) 120px minmax(160px, 1fr) auto;
   gap: 10px;
   align-items: end;
   margin: 10px 0 18px;
+}
+/* Trakt lists have no movie/show choice, so the form loses that column */
+.rc-newrow-form.is-trakt {
+  grid-template-columns: 130px minmax(140px, 1fr) minmax(180px, 2fr) minmax(160px, 1fr) auto;
 }
 .rc-row-check {
   display: flex;

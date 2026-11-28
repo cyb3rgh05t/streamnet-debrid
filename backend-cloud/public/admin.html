@@ -707,11 +707,22 @@
                 <h3 class="rc-heading">Reihen der App</h3>
                 <div id="rc-rows" class="rc-list"></div>
                 <h3 class="rc-heading">Zusätzliche Home-Kataloge für alle</h3>
+                <p class="rc-hint">
+                  Eine MDBList- oder Trakt-Liste, die als Reihe auf der Startseite aller Geräte erscheint (auch bei
+                  Neuinstallationen). Trakt-Reihen zeigen erst Android ab 2.6.035 und der Web-Player ab 1.0.092; ältere
+                  Versionen ignorieren sie.
+                </p>
                 <div id="rc-newrows" class="rc-source-rows"></div>
-                <div class="rc-newrow-form">
+                <div class="rc-newrow-form" id="rc-newrow-form">
+                  <label>Quelle
+                    <select id="rc-nr-source">
+                      <option value="mdblist">MDBList-Liste</option>
+                      <option value="trakt">Trakt-Liste</option>
+                    </select>
+                  </label>
                   <label>Titel<input id="rc-nr-title" maxlength="60" autocomplete="off" placeholder="z. B. Top Horror" /></label>
-                  <label>MDBList-Liste<input id="rc-nr-url" autocomplete="off" placeholder="user/liste oder https://mdblist.com/lists/user/liste" /></label>
-                  <label>Inhalt
+                  <label><span id="rc-nr-url-label">MDBList-Liste</span><input id="rc-nr-url" autocomplete="off" placeholder="user/liste oder https://mdblist.com/lists/user/liste" /></label>
+                  <label id="rc-nr-type-field">Inhalt
                     <select id="rc-nr-type">
                       <option value="">Gemischt</option>
                       <option value="movie">Filme</option>
@@ -801,7 +812,7 @@
                 <h3 class="rc-heading">Zentral: was du ändern kannst</h3>
                 <ul>
                   <li><strong>Collections</strong> – Name, Cover, MDBList-Listen und bei Franchises auch TMDB-Collections und einzelne Filme/Serien jeder Collection (Franchises, Streamingdienste, Jahrzehnte, Genres). Bei Streamingdiensten kommt das Intro-Video dazu. Eigene Franchises (mit Filme-, Serien- und Timeline-Tab), eigene Streamingdienste (über die TMDB-Anbieter-ID) und eigene Jahrzehnte (über eine MDBList-Liste) legst du hier an. Neben jedem Feld steht der Default der App zum Kopieren.</li>
-                  <li><strong>Home-Kataloge</strong> – jede Reihe der Startseite ein-/ausblenden (gilt für alle), die MDBList-Liste einer Reihe austauschen und zusätzliche Kataloge hinzufügen.</li>
+                  <li><strong>Home-Kataloge</strong> – jede Reihe der Startseite ein-/ausblenden (gilt für alle), die MDBList-Liste einer Reihe austauschen und zusätzliche Kataloge aus einer MDBList- oder Trakt-Liste hinzufügen.</li>
                 </ul>
                 <p>
                   <strong>TMDB-Collection</strong> = eine Filmreihe bei TMDB mit mehreren Filmen (z. B. 645 = James Bond).
@@ -818,7 +829,7 @@
 
                 <h3 class="rc-heading">Bei bestehenden Accounts: was die Aktionen tun</h3>
                 <ul>
-                  <li><strong>Neue Home-Kataloge</strong> – legst du oben unter „Zusätzliche Home-Kataloge für alle“ an (MDBList-Liste, gilt auch für Neuinstallationen).</li>
+                  <li><strong>Neue Home-Kataloge</strong> – legst du oben unter „Zusätzliche Home-Kataloge für alle“ an (MDBList- oder Trakt-Liste, gilt auch für Neuinstallationen). Trakt-Reihen zeigen nur Apps ab Android 2.6.035 und der Web-Player ab 1.0.092; ältere Versionen ignorieren sie.</li>
                   <li><strong>Katalog umbenennen</strong> – wirkt auf die App-Kataloge in den gespeicherten Accounts. Ein- und Ausblenden einer Reihe geht oben mit dem Schalter und gilt für alle Geräte.</li>
                   <li><strong>Alte Austausche zurücksetzen</strong> – entfernt Listen-Austausche, die früher pro Account gespeichert wurden, damit wieder die zentralen Werte gelten.</li>
                   <li><strong>Veraltetes bereinigen</strong> – entfernt Netzwerk-, Studio- und Featured-Collections, die die aktuelle App nicht mehr ausliefert.</li>

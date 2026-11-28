@@ -9,7 +9,9 @@ import com.arflix.tv.data.model.CollectionGroupKind
 import com.arflix.tv.data.model.CollectionSourceConfig
 import com.arflix.tv.data.model.CollectionSourceKind
 import com.arflix.tv.data.model.CollectionTileShape
+import com.arflix.tv.util.CatalogUrlParser
 import com.arflix.tv.util.Constants
+import com.arflix.tv.util.ParsedCatalogUrl
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
@@ -63,10 +65,18 @@ internal data class CentralSources(
 
 internal const val CENTRAL_ROW_PREFIX = "central_row_"
 
-/** A Home row the admin added for everyone: an MDBList list, optionally placed after another row. */
-internal data class CentralRow(val id: String, val title: String, val url: String, val after: String) {
+/** A Home row the admin added for everyone: an MDBList or Trakt list, optionally placed after another row. */
+internal data class CentralRow(
+    val id: String,
+    val title: String,
+    val url: String,
+    val after: String,
+    val source: CentralRowSource = CentralRowSource.MDBLIST
+) {
     val catalogId: String get() = CENTRAL_ROW_PREFIX + id.replace('-', '_')
 }
+
+internal enum class CentralRowSource { MDBLIST, TRAKT }
 
 /** A collection the admin added for everyone: a streaming service (TMDB watch providers, MDBList lists) or a decade (MDBList lists). */
 internal data class CentralCollection(
@@ -264,8 +274,18 @@ class CatalogConfigRepository @Inject constructor(
                     val id = row.get("id")?.asString?.trim().orEmpty()
                     val title = row.get("title")?.asString?.trim().orEmpty().take(MAX_TITLE_LENGTH)
                     val url = row.get("url")?.asString?.trim().orEmpty()
-                    if (!franchiseIdPattern.matches(id) || title.isBlank() || !isValidRemoteMdblistUrl(url)) return@mapNotNull null
-                    CentralRow(id, title, url, row.get("after")?.takeIf { !it.isJsonNull }?.asString?.trim().orEmpty())
+                    // No `source` means MDBList (older backends); a source this app does not know drops the row.
+                    val source = when (row.get("source")?.takeIf { !it.isJsonNull }?.asString?.trim()?.lowercase()) {
+                        null, "", "mdblist" -> CentralRowSource.MDBLIST
+                        "trakt" -> CentralRowSource.TRAKT
+                        else -> return@mapNotNull null
+                    }
+                    val validUrl = when (source) {
+                        CentralRowSource.MDBLIST -> isValidRemoteMdblistUrl(url)
+                        CentralRowSource.TRAKT -> isValidRemoteTraktUrl(url)
+                    }
+                    if (!franchiseIdPattern.matches(id) || title.isBlank() || !validUrl) return@mapNotNull null
+                    CentralRow(id, title, url, row.get("after")?.takeIf { !it.isJsonNull }?.asString?.trim().orEmpty(), source)
                 }.take(20),
                 covers = strings("covers"),
                 intros = strings("intros"),
@@ -394,18 +414,41 @@ class CatalogConfigRepository @Inject constructor(
             val result = catalogs.toMutableList()
             for (row in rows) {
                 if (result.any { it.id == row.catalogId }) continue
-                val catalog = CatalogConfig(
-                    id = row.catalogId,
-                    title = row.title,
-                    sourceType = CatalogSourceType.MDBLIST,
-                    sourceUrl = row.url,
-                    sourceRef = "mdblist:${row.url}",
-                    isPreinstalled = true
-                )
+                val catalog = centralRowCatalog(row) ?: continue
                 val anchor = result.indexOfFirst { it.id == row.after || it.id == CENTRAL_ROW_PREFIX + row.after.replace('-', '_') }
                 if (row.after.isNotBlank() && anchor >= 0) result.add(anchor + 1, catalog) else result.add(catalog)
             }
             return result
+        }
+
+        /** The catalog of a central row; null when a Trakt link cannot be read (the parser already vetted the URL). */
+        internal fun centralRowCatalog(row: CentralRow): CatalogConfig? = when (row.source) {
+            CentralRowSource.MDBLIST -> CatalogConfig(
+                id = row.catalogId,
+                title = row.title,
+                sourceType = CatalogSourceType.MDBLIST,
+                sourceUrl = row.url,
+                sourceRef = "mdblist:${row.url}",
+                isPreinstalled = true
+            )
+            CentralRowSource.TRAKT -> {
+                // Same references the app stores for a Trakt list a user adds himself.
+                val sourceRef = when (val parsed = CatalogUrlParser.parseTrakt(row.url)) {
+                    is ParsedCatalogUrl.TraktUserList -> "trakt_user:${parsed.username}:${parsed.listId}"
+                    is ParsedCatalogUrl.TraktList -> "trakt_list:${parsed.listId}"
+                    else -> null
+                }
+                sourceRef?.let {
+                    CatalogConfig(
+                        id = row.catalogId,
+                        title = row.title,
+                        sourceType = CatalogSourceType.TRAKT,
+                        sourceUrl = row.url,
+                        sourceRef = it,
+                        isPreinstalled = true
+                    )
+                }
+            }
         }
 
         /** One bundled catalog with the central tab lists and overrides applied. */

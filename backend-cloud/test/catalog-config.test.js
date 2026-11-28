@@ -234,6 +234,30 @@ test("home rows: standard rows can be hidden for everyone and new MDBList rows a
   assert.deepEqual(saved.json().overrides.hidden, [rail.id]);
 });
 
+test("home rows can come from a Trakt list; the link is normalised and anything else is rejected", async () => {
+  const standards = await loadStandards();
+  const clean = validateOverrides({
+    newRows: [
+      { id: "mdb", title: "Aus MDBList", url: "snoak/top-horror", mediaType: "movie", source: "mdblist" },
+      { id: "no-source", title: "Ohne Quelle", url: "snoak/top-horror" },
+      { id: "trakt-user", title: "Trakt User", url: "http://www.trakt.tv/users/Justin/lists/Top-Horror?sort=added#x", mediaType: "movie", source: "trakt", after: "mdb" },
+      { id: "trakt-id", title: "Trakt ID", url: "trakt.tv/lists/2142753", source: "trakt" },
+    ],
+  }, standards);
+  assert.deepEqual(clean.newRows.map((row) => row.source), ["mdblist", "mdblist", "trakt", "trakt"]);
+  assert.equal(clean.newRows[0].mediaType, "movie");
+  assert.equal(clean.newRows[2].url, "https://trakt.tv/users/Justin/lists/Top-Horror");
+  assert.equal(clean.newRows[2].mediaType, "", "Trakt lists hold movies and shows, so no type is stored");
+  assert.equal(clean.newRows[3].url, "https://trakt.tv/lists/2142753");
+
+  const row = (extra) => ({ newRows: [{ id: "good-id", title: "Row", ...extra }] });
+  assert.throws(() => validateOverrides(row({ source: "trakt", url: "snoak/top-horror" }), standards), /not a Trakt link/);
+  assert.throws(() => validateOverrides(row({ source: "trakt", url: "https://mdblist.com/lists/me/x" }), standards), /not a Trakt link/);
+  assert.throws(() => validateOverrides(row({ source: "trakt", url: "https://trakt.tv/movies/trending" }), standards), /not a Trakt link/);
+  assert.throws(() => validateOverrides(row({ source: "mdblist", url: "https://trakt.tv/users/a/lists/b" }), standards), /not an MDBList link/);
+  assert.throws(() => validateOverrides(row({ source: "addon", url: "me/x" }), standards), /unknown list source/);
+});
+
 test("services and decades can be added for everyone and collections renamed or given another intro, with validation", async () => {
   const standards = await loadStandards();
   const netflix = standards.find((s) => s.id === "collection_service_netflix");
