@@ -3358,6 +3358,17 @@ tbody tr[data-account-id]:focus .account-primary {
   padding-top: 0;
   border-top: 0;
 }
+/* Save button, status message and the next section need air between them */
+.rc-actions-row + .message {
+  margin-top: 18px;
+}
+.rc-panel > form + .rc-heading {
+  margin-top: 48px;
+  padding-top: 28px;
+}
+.rc-panel > form + .rc-heading + .rc-intro {
+  margin-bottom: 22px;
+}
 .rc-extra {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;

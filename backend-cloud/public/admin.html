@@ -730,7 +730,8 @@
               <h3 class="rc-heading">Bei bestehenden Accounts anpassen</h3>
               <p class="rc-intro">
                 Die Einstellungen oben gelten für alle Geräte. Diese Aktionen ändern zusätzlich die gespeicherten
-                Kataloge bereits registrierter Accounts (Titel, ein-/ausblenden, löschen, aufräumen). Nur Kataloge der App
+                Kataloge bereits registrierter Accounts (Titel ändern, Katalog verteilen, aufräumen). Das Ein- und Ausblenden
+                einer Reihe stellst du oben mit dem Schalter ein; er gilt für alle Geräte. Nur Kataloge der App
                 werden aufgelistet; selbst angelegte Kataloge der Nutzer bleiben unberührt.
               </p>
               <div id="rc-slot-catalogs" class="rc-account-slot"></div>
@@ -817,7 +818,7 @@
                 <h3 class="rc-heading">Bei bestehenden Accounts: was die Aktionen tun</h3>
                 <ul>
                   <li><strong>Home-Kataloge → Katalog an alle Accounts verteilen</strong> – legt einen Katalog bei allen Accounts an oder aktualisiert ihn.</li>
-                  <li><strong>Katalog umbenennen / ein- bzw. ausblenden / löschen</strong> – wirkt auf die App-Kataloge in den gespeicherten Accounts. Kataloge der App werden nur ausgeblendet, nicht gelöscht.</li>
+                  <li><strong>Katalog umbenennen</strong> – wirkt auf die App-Kataloge in den gespeicherten Accounts. Ein- und Ausblenden einer Reihe geht oben mit dem Schalter und gilt für alle Geräte.</li>
                   <li><strong>Alte Austausche zurücksetzen</strong> – entfernt Listen-Austausche, die früher pro Account gespeichert wurden, damit wieder die zentralen Werte gelten.</li>
                   <li><strong>Veraltetes bereinigen</strong> – entfernt Netzwerk-, Studio- und Featured-Collections, die die aktuelle App nicht mehr ausliefert.</li>
                   <li><strong>Playlists</strong> – die StreamNet-TV-Playlist bearbeiten (z. B. Server-Adresse ändern oder den Host-Override entfernen) oder eine Playlist bei allen Accounts hinzufügen.</li>
@@ -828,8 +829,7 @@
                 <p>
                   Selbst hinzugefügte <strong>Add-ons, Playlists, Trakt-/MDBList-Kataloge und Add-on-Kataloge</strong> gehören dem Nutzer.
                   Sie tauchen in den Listen hier nicht auf, die zentrale Konfiguration berührt sie nicht, und die Aktionen
-                  verändern sie nicht (Ausnahme: die Sammelaktionen „Alle Playlists / Alle Add-ons entfernen“, die bewusst alles
-                  eines Accounts betreffen – vor dem Bestätigen die Vorschau prüfen). Auch ein ausgeblendeter oder ersetzter
+                  verändern sie nicht. Auch ein ausgeblendeter oder ersetzter
                   App-Katalog betrifft nur die Reihen der App, nicht die eigenen Kataloge eines Nutzers.
                 </p>
 
@@ -888,35 +888,17 @@
                         StreamNet TV: Host-Override entfernen (zurück auf
                         App-Server)
                       </option>
-                      <option value="delete_playlist">
-                        Ausgewählte Playlist global entfernen
-                      </option>
-                      <option value="clear_playlists">
-                        Alle Playlists global entfernen
-                      </option>
                       <option value="add_addon">
                         Add-on global hinzufügen / aktualisieren
                       </option>
                       <option value="edit_addon">
                         Vorhandenes Add-on global bearbeiten
                       </option>
-                      <option value="delete_addon">
-                        Ausgewähltes Add-on global entfernen
-                      </option>
-                      <option value="clear_addons">
-                        Alle Add-ons global entfernen
-                      </option>
                       <option value="add_catalog">
                         Katalog an alle Accounts verteilen (neu / aktualisieren)
                       </option>
                       <option value="rename_catalog">
                         Katalog: Titel bei allen Accounts ändern
-                      </option>
-                      <option value="set_catalog_enabled">
-                        Katalog: bei allen Accounts ein- / ausblenden
-                      </option>
-                      <option value="delete_catalog">
-                        Katalog der App bei allen Accounts ausblenden / entfernen
                       </option>
                       <option value="clear_catalog_source">
                         Alte Austausche bei Accounts zurücksetzen (zentrale Werte gelten wieder)

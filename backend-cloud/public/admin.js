@@ -2596,7 +2596,7 @@ const rcInventories = {
   playlists: {
     key: "playlists", noun: "Playlist",
     note: "Die App legt diese Playlist selbst an und lässt sie nicht löschen. Hier zählen nur Accounts, in deren Cloud-Snapshot sie schon steht; Geräte ohne Cloud-Konto oder ohne Sync sind hier nicht sichtbar.",
-    actions: [["Bearbeiten", "edit_playlist"], ["Host ändern", "change_xtream_host"], ["Entfernen", "delete_playlist"]],
+    actions: [["Bearbeiten", "edit_playlist"], ["Host ändern", "change_xtream_host"]],
     extra: { streamnet_tv: [["Host zurücksetzen", "clear_streamnet_host_override"]] },
     add: ["Playlist hinzufügen", "add_playlist"],
     addNote: "Zusätzliche Playlists (M3U oder Xtream), die du an alle bereits registrierten Accounts verteilst. Sie sind unabhängig von der Default-Playlist der App; Playlists, die Nutzer selbst angelegt haben, bleiben unberührt.",
@@ -2604,7 +2604,7 @@ const rcInventories = {
   addons: {
     key: "addons", noun: "Add-on",
     note: "Die App und der Webplayer bringen dieses Add-on fest mit; es lässt sich nicht löschen. Gezählt werden Accounts, in deren Cloud-Snapshot es steht (App-ID opensubtitles oder Web-ID org.stremio.opensubtitlesv3, beides gilt als dasselbe Add-on), also nach dem ersten Sync. Accounts ohne Eintrag nutzen es trotzdem als eingebaute Quelle.",
-    actions: [["Bearbeiten", "edit_addon"], ["Entfernen", "delete_addon"]],
+    actions: [["Bearbeiten", "edit_addon"]],
     extra: {},
     add: ["Add-on hinzufügen", "add_addon"],
     addNote: "Zusätzliche Add-ons, die du an alle bereits registrierten Accounts verteilst. Sie sind unabhängig vom Default-Add-on der App; Add-ons, die Nutzer selbst installiert haben, bleiben unberührt.",

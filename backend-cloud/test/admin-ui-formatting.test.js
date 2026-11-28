@@ -78,10 +78,10 @@ test("Remote Config offers only the per-account actions; lists, covers and added
   const groups = { playlists: [], addons: [], catalogs: [] };
   for (const operation of operations) groups[context.globalOperationCategory(operation)].push(operation);
   assert.deepEqual(groups, {
-    playlists: ["add_playlist", "edit_playlist", "change_xtream_host", "clear_streamnet_host_override", "delete_playlist", "clear_playlists"],
-    addons: ["add_addon", "edit_addon", "delete_addon", "clear_addons"],
+    playlists: ["add_playlist", "edit_playlist", "change_xtream_host", "clear_streamnet_host_override"],
+    addons: ["add_addon", "edit_addon"],
     catalogs: [
-      "add_catalog", "rename_catalog", "set_catalog_enabled", "delete_catalog",
+      "add_catalog", "rename_catalog",
       "clear_catalog_source", "remove_obsolete_catalogs",
     ],
   });
