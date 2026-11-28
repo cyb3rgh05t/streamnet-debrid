@@ -11,6 +11,7 @@ import { useApp } from "@/lib/store";
 import { buildHomeCatalogEntries } from "@/lib/catalogs";
 import { getCentralConfig } from "@/lib/catalogConfig";
 import { LazyRail } from "@/components/media/LazyRail";
+import { TvChannelRail, type HomeTvRailKind } from "@/components/home/TvChannelRail";
 import { MediaRail } from "@/components/media/MediaRail";
 import type { CatalogConfig, Category, MediaItem } from "@/lib/types";
 import { localize, t, translateUiText } from "@/lib/i18n";
@@ -261,6 +262,15 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
       ),
     );
   }, [catalogConfigs]);
+  // Favorite / recently watched TV are enabled in the catalog settings; their rails resolve the channels themselves.
+  const tvRailCatalogs = useMemo(
+    () =>
+      catalogConfigs.filter(
+        (catalog) =>
+          settingsOnlyCatalogIds.has(catalog.id) && catalog.enabled !== false,
+      ),
+    [catalogConfigs],
+  );
 
   // The eager rails (trending/popular/provider lists) overlap heavily; keep each
   // title in the first rail it appears in and trim repeats from later rails,
@@ -326,6 +336,11 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
                 index,
               ),
       })),
+      ...tvRailCatalogs.map((catalog, index) => ({
+        kind: "tv" as const,
+        tvKind: catalog.id as HomeTvRailKind,
+        rank: rank(catalog.id, index),
+      })),
     ];
     const seenRailIds = new Set<string>();
     return entries
@@ -334,9 +349,11 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
         const railId =
           entry.kind === "category" || entry.kind === "server"
             ? entry.category.id
-            : entry.entry.type === "catalog"
-              ? entry.entry.catalog.id
-              : `group-${entry.entry.group}`;
+            : entry.kind === "tv"
+              ? entry.tvKind
+              : entry.entry.type === "catalog"
+                ? entry.entry.catalog.id
+                : `group-${entry.entry.group}`;
         if (seenRailIds.has(railId)) return false;
         seenRailIds.add(railId);
         return true;
@@ -345,6 +362,7 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
     dedupedCategories,
     homeCatalogEntries,
     homeServerRows,
+    tvRailCatalogs,
     settings.catalogs,
   ]);
   const [heroLogo, setHeroLogo] = useState<string | null>(null);
@@ -582,7 +600,9 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
           {continueWatching.length > 0 && !hasContinueWatchingRail ? <HomeTips /> : null}
           {orderedHomeRails.map((rail, index) => {
             const railNode =
-            rail.kind === "category" || rail.kind === "server" ? (
+            rail.kind === "tv" ? (
+              <TvChannelRail key={rail.tvKind} kind={rail.tvKind} />
+            ) : rail.kind === "category" || rail.kind === "server" ? (
               <MediaRail
                 key={rail.category.id}
                 category={rail.category}
@@ -664,11 +684,13 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
               />
             );
             const railKey =
-              rail.kind === "category" || rail.kind === "server"
-                ? rail.category.id
-                : "group" in rail.entry
-                  ? `group-${rail.entry.group}`
-                  : rail.entry.catalog.id;
+              rail.kind === "tv"
+                ? rail.tvKind
+                : rail.kind === "category" || rail.kind === "server"
+                  ? rail.category.id
+                  : "group" in rail.entry
+                    ? `group-${rail.entry.group}`
+                    : rail.entry.catalog.id;
             return (
               <Fragment key={railKey}>
                 {railNode}

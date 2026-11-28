@@ -872,14 +872,25 @@ export function mergeCatalogs(
       enabled: !hiddenIds.includes(catalog.id) && catalog.enabled !== false,
     };
   });
-  for (const catalog of defaults) {
+  for (const [defaultIndex, catalog] of defaults.entries()) {
     if (savedById.has(catalog.id)) continue;
-    const rank = defaultCatalogRank.get(catalog.id) ?? Number.MAX_SAFE_INTEGER;
-    const successor = result.findIndex(
-      (candidate) => (defaultCatalogRank.get(candidate.id) ?? -1) > rank,
-    );
     const enabled = !hiddenIds.includes(catalog.id) && catalog.enabled;
-    result.splice(successor < 0 ? result.length : successor, 0, {
+    let at: number;
+    if (defaultCatalogRank.has(catalog.id)) {
+      const rank = defaultCatalogRank.get(catalog.id)!;
+      const successor = result.findIndex(
+        (candidate) => (defaultCatalogRank.get(candidate.id) ?? -1) > rank,
+      );
+      at = successor < 0 ? result.length : successor;
+    } else {
+      // Rows the admin added: right after the default row that precedes them, like the apps place them.
+      let previous = -1;
+      for (let index = defaultIndex - 1; index >= 0 && previous < 0; index--) {
+        previous = result.findIndex((candidate) => candidate.id === defaults[index].id);
+      }
+      at = previous < 0 ? result.length : previous + 1;
+    }
+    result.splice(at, 0, {
       ...catalog,
       enabled,
     });
