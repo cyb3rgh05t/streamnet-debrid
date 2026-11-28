@@ -748,6 +748,9 @@ data class IptvCloudProfileState(
     val groupOrder: List<String> = emptyList(),
     val groupOrderSchema: Int = 0,
     val groupPreferencesUpdatedAt: Long = 0L,
+    // Nullable: payloads written by older app versions lack these fields and Gson leaves them null.
+    val hiddenChannels: List<String>? = null,
+    val channelOrder: List<String>? = null,
     val sortOrder: String = "provider",
     val playlists: List<IptvPlaylistEntry> = emptyList(),
     val tvSession: IptvTvSessionState = IptvTvSessionState(),
@@ -1139,6 +1142,16 @@ class IptvRepository @Inject constructor(
     fun observeGroupOrder(): Flow<List<String>> =
         profileManager.activeProfileId.combine(context.settingsDataStore.data) { profileId, prefs ->
             decodeGroupOrder(prefs, profileId)
+        }
+
+    fun observeHiddenChannels(): Flow<List<String>> =
+        profileManager.activeProfileId.combine(context.settingsDataStore.data) { profileId, prefs ->
+            decodeHiddenChannels(prefs, profileId)
+        }
+
+    fun observeChannelOrder(): Flow<List<String>> =
+        profileManager.activeProfileId.combine(context.settingsDataStore.data) { profileId, prefs ->
+            decodeChannelOrder(prefs, profileId)
         }
 
     fun observeTvSessionState(): Flow<IptvTvSessionState> =
@@ -2191,6 +2204,8 @@ class IptvRepository @Inject constructor(
             prefs.remove(hiddenGroupsKey())
             prefs.remove(groupOrderKey())
             prefs.remove(groupOrderSchemaKey())
+            prefs.remove(hiddenChannelsKey())
+            prefs.remove(channelOrderKey())
             prefs.remove(tvSessionKey())
         }
         markGroupPreferencesLocallyDirty()
@@ -2359,6 +2374,38 @@ class IptvRepository @Inject constructor(
             prefs[favoriteChannelsKey()] = gson.toJson(existing)
         }
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "toggle favorite channel")
+    }
+
+    suspend fun toggleHiddenChannel(channelId: String) {
+        val trimmed = channelId.trim()
+        if (trimmed.isEmpty()) return
+        context.settingsDataStore.edit { prefs ->
+            val hidden = decodeHiddenChannels(prefs).toMutableList()
+            if (!hidden.remove(trimmed)) hidden.add(trimmed)
+            if (hidden.isEmpty()) prefs.remove(hiddenChannelsKey())
+            else prefs[hiddenChannelsKey()] = gson.toJson(hidden)
+        }
+        markGroupPreferencesLocallyDirty()
+        invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "toggle hidden channel")
+    }
+
+    suspend fun moveChannelUp(channelId: String, visibleChannelIds: List<String>) =
+        moveChannel(channelId, visibleChannelIds, IptvGroupOrderMove.UP)
+
+    suspend fun moveChannelToTop(channelId: String, visibleChannelIds: List<String>) =
+        moveChannel(channelId, visibleChannelIds, IptvGroupOrderMove.TOP)
+
+    suspend fun moveChannelDown(channelId: String, visibleChannelIds: List<String>) =
+        moveChannel(channelId, visibleChannelIds, IptvGroupOrderMove.DOWN)
+
+    private suspend fun moveChannel(channelId: String, visibleChannelIds: List<String>, move: IptvGroupOrderMove) {
+        context.settingsDataStore.edit { prefs ->
+            val order = reorderIptvChannels(decodeChannelOrder(prefs), visibleChannelIds, channelId, move)
+            if (order.isEmpty()) prefs.remove(channelOrderKey())
+            else prefs[channelOrderKey()] = gson.toJson(order)
+        }
+        markGroupPreferencesLocallyDirty()
+        invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "move channel")
     }
 
     suspend fun loadSnapshot(
@@ -3851,6 +3898,12 @@ class IptvRepository @Inject constructor(
         profileManager.profileStringKeyFor(profileId, "iptv_group_order_schema")
     private fun groupPreferencesUpdatedAtKey(): Preferences.Key<String> =
         profileManager.profileStringKey("iptv_group_preferences_updated_at")
+    private fun hiddenChannelsKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_hidden_channels")
+    private fun hiddenChannelsKeyFor(profileId: String): Preferences.Key<String> =
+        profileManager.profileStringKeyFor(profileId, "iptv_hidden_channels")
+    private fun channelOrderKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_channel_order")
+    private fun channelOrderKeyFor(profileId: String): Preferences.Key<String> =
+        profileManager.profileStringKeyFor(profileId, "iptv_channel_order")
     private fun groupPreferencesUpdatedAtKeyFor(profileId: String): Preferences.Key<String> =
         profileManager.profileStringKeyFor(profileId, "iptv_group_preferences_updated_at")
     private fun playlistsKeyFor(profileId: String): Preferences.Key<String> =
@@ -3923,6 +3976,27 @@ class IptvRepository @Inject constructor(
             } else migrated
         }.getOrDefault(emptyList())
     }
+
+    private fun decodeChannelIdList(prefs: Preferences, key: Preferences.Key<String>, profileId: String): List<String> {
+        val raw = prefs[key].orEmpty()
+        if (raw.isBlank()) return emptyList()
+        return runCatching {
+            val ids = decodeStringList(raw).map { it.trim() }.filter { it.isNotBlank() }.distinct()
+            val storedPlaylists = decodePlaylists(prefs[playlistsKeyFor(profileId)].orEmpty())
+            migrateStreamNetChannelIds(
+                ids,
+                storedPlaylists,
+                BuildConfig.STREAMNET_TV_XTREAM_URL,
+                ensureStreamNetTvPreset(storedPlaylists, BuildConfig.STREAMNET_TV_XTREAM_URL),
+            )
+        }.getOrDefault(emptyList())
+    }
+
+    private fun decodeHiddenChannels(prefs: Preferences, profileId: String = profileManager.getProfileIdSync()): List<String> =
+        decodeChannelIdList(prefs, hiddenChannelsKeyFor(profileId), profileId)
+
+    private fun decodeChannelOrder(prefs: Preferences, profileId: String = profileManager.getProfileIdSync()): List<String> =
+        decodeChannelIdList(prefs, channelOrderKeyFor(profileId), profileId)
 
     private fun decodeFavoriteChannels(prefs: Preferences): List<String> {
         val raw = prefs[favoriteChannelsKey()].orEmpty()
@@ -4041,6 +4115,8 @@ class IptvRepository @Inject constructor(
             } else emptyList(),
             groupOrderSchema = IPTV_GROUP_ORDER_SCHEMA,
             groupPreferencesUpdatedAt = groupPreferencesUpdatedAt,
+            hiddenChannels = decodeChannelIdList(prefs, hiddenChannelsKeyFor(safeProfileId), safeProfileId),
+            channelOrder = decodeChannelIdList(prefs, channelOrderKeyFor(safeProfileId), safeProfileId),
             sortOrder = normalizeIptvSortOrder(prefs[sortOrderKeyFor(safeProfileId)]),
             playlists = playlists,
             tvSession = decodeTvSessionState(tvSessionRaw),
@@ -4129,6 +4205,26 @@ class IptvRepository @Inject constructor(
                 if (normalizedGroupOrder.isEmpty()) prefs.remove(groupOrderKeyFor(safeProfileId))
                 else prefs[groupOrderKeyFor(safeProfileId)] = gson.toJson(normalizedGroupOrder)
                 prefs[groupOrderSchemaKeyFor(safeProfileId)] = IPTV_GROUP_ORDER_SCHEMA.toString()
+                state.hiddenChannels?.let { remoteHidden ->
+                    val normalized = migrateStreamNetChannelIds(
+                        remoteHidden.map(String::trim).filter(String::isNotBlank).distinct(),
+                        normalizedPlaylists,
+                        BuildConfig.STREAMNET_TV_XTREAM_URL,
+                        effectivePlaylists,
+                    )
+                    if (normalized.isEmpty()) prefs.remove(hiddenChannelsKeyFor(safeProfileId))
+                    else prefs[hiddenChannelsKeyFor(safeProfileId)] = gson.toJson(normalized)
+                }
+                state.channelOrder?.let { remoteOrder ->
+                    val normalized = migrateStreamNetChannelIds(
+                        remoteOrder.map(String::trim).filter(String::isNotBlank).distinct(),
+                        normalizedPlaylists,
+                        BuildConfig.STREAMNET_TV_XTREAM_URL,
+                        effectivePlaylists,
+                    )
+                    if (normalized.isEmpty()) prefs.remove(channelOrderKeyFor(safeProfileId))
+                    else prefs[channelOrderKeyFor(safeProfileId)] = gson.toJson(normalized)
+                }
                 if (state.groupPreferencesUpdatedAt > 0L) {
                     prefs[groupPreferencesUpdatedAtKeyFor(safeProfileId)] = state.groupPreferencesUpdatedAt.toString()
                 }

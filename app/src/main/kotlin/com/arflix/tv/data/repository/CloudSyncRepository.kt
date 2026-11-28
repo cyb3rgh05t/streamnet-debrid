@@ -164,6 +164,8 @@ internal fun mergeRemoteIptvGroupPreferences(
             remoteProfile.optJSONArray("hiddenGroups")?.let { remoteHiddenGroups ->
                 localProfile.put("hiddenGroups", remoteHiddenGroups)
             }
+            remoteProfile.optJSONArray("hiddenChannels")?.let { localProfile.put("hiddenChannels", it) }
+            remoteProfile.optJSONArray("channelOrder")?.let { localProfile.put("channelOrder", it) }
             if (remoteProfile.optInt("groupOrderSchema", 0) < IPTV_GROUP_ORDER_SCHEMA) continue
             val remoteGroupOrder = remoteProfile.optJSONArray("groupOrder") ?: continue
             localProfile.put("groupOrder", remoteGroupOrder)
@@ -1108,6 +1110,8 @@ class CloudSyncRepository @Inject constructor(
     private val profileMergeExclude = setOf("defaultSubtitle", "subtitleSettingsUpdatedAt")
     private val iptvMergeExclude = setOf(
         "hiddenGroups",
+        "hiddenChannels",
+        "channelOrder",
         "groupOrder",
         "groupOrderSchema",
         "groupPreferencesUpdatedAt",

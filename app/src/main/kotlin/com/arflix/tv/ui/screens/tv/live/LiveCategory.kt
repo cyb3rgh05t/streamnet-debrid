@@ -450,7 +450,24 @@ internal fun sortChannelsByConfiguredOrder(
     else -> channels
 }
 
-enum class CategoryIcon { Favorite, Recent, All, Grid, Sport, Movie, News, Kids, Docs, Music, Lock, Country, SubEntry }
+enum class CategoryIcon { Favorite, Recent, All, Grid, Sport, Movie, News, Kids, Docs, Music, Lock, Country, SubEntry, Hidden }
+
+/** Virtual category listing the channels the user hid; only present while at least one is hidden. */
+internal const val HIDDEN_CHANNELS_CATEGORY_ID = "hiddench"
+
+/** Recently watched is ordered by time and the hidden-channels list is a management view; every other category honors the custom order. */
+internal fun isChannelOrderCategory(categoryId: String): Boolean =
+    categoryId != "recent" && categoryId != HIDDEN_CHANNELS_CATEGORY_ID
+
+internal fun LiveCategoryTree.withHiddenChannelsCategory(hiddenCount: Int): LiveCategoryTree =
+    if (hiddenCount <= 0) this else copy(
+        top = top + LiveCategory(
+            HIDDEN_CHANNELS_CATEGORY_ID,
+            "Hidden Channels",
+            hiddenCount,
+            CategoryIcon.Hidden,
+        ),
+    )
 
 /**
  * Display-localization for category labels. The stored [LiveCategory.label] stays in English
@@ -464,6 +481,7 @@ fun liveCategoryLabel(raw: String): String = when (raw) {
     "All Channels" -> stringResource(R.string.live_label_all_channels)
     "Adult" -> stringResource(R.string.live_cat_adult)
     "Ungrouped" -> stringResource(R.string.live_cat_ungrouped)
+    "Hidden Channels" -> stringResource(R.string.live_cat_hidden_channels)
     else -> raw
 }
 

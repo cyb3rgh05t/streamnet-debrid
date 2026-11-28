@@ -90,6 +90,7 @@ internal fun LiveTvClassicLayout(
     onRequestPreviousChannels: () -> Unit,
     onRequestNextChannels: () -> Unit,
     contentTopPadding: Dp,
+    onChannelMenu: ((EnrichedChannel) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -184,6 +185,7 @@ internal fun LiveTvClassicLayout(
                 favorites = favoriteSet,
                 variantCountFor = variantCountFor,
                 onOpenVariants = onOpenVariants,
+                onChannelMenu = onChannelMenu,
                 onMoveLeftFromChannels = onMoveLeftFromChannels,
                 onEnterEpg = onEnterEpg,
                 onExitEpg = onExitEpg,
@@ -244,6 +246,7 @@ internal fun LiveTvClassicLayout(
                     favorites = favoriteSet,
                     variantCountFor = variantCountFor,
                     onOpenVariants = onOpenVariants,
+                    onChannelMenu = onChannelMenu,
                     onMoveLeftFromChannels = onMoveLeftFromChannels,
                     onEnterEpg = onEnterEpg,
                     onExitEpg = onExitEpg,

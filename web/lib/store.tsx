@@ -366,6 +366,8 @@ export const defaultSettings: AppSettings = {
   favoriteGroupIds: [],
   hiddenGroupIds: [],
   groupOrder: [],
+  hiddenChannelIds: [],
+  channelOrder: [],
   customTmdbApiKey: "",
   customTvdbApiKey: "",
   customTvdbUserPin: "",
@@ -1376,6 +1378,11 @@ export function AppProvider({
                 currentSettings.lockedIptvGroupIds,
               groupOrder:
                 cloud.settings?.groupOrder ?? currentSettings.groupOrder,
+              hiddenChannelIds:
+                cloud.settings?.hiddenChannelIds ??
+                currentSettings.hiddenChannelIds,
+              channelOrder:
+                cloud.settings?.channelOrder ?? currentSettings.channelOrder,
             };
             if (!sameSettings(settingsRef.current, effectiveSettings))
               setSettings(effectiveSettings);

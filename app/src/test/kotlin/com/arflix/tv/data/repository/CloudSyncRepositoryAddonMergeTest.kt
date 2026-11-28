@@ -207,8 +207,8 @@ class CloudSyncRepositoryAddonMergeTest {
 
     @Test
     fun `remote IPTV group preferences win unless changed locally`() {
-        val local = """{"iptvByProfile":{"main":{"hiddenGroups":["list|Local Hidden"],"groupOrder":["list|Local First"],"groupOrderSchema":3}}}"""
-        val remote = """{"iptvByProfile":{"main":{"hiddenGroups":["list|Remote Hidden"],"groupOrder":["list|Remote First"],"groupOrderSchema":3}}}"""
+        val local = """{"iptvByProfile":{"main":{"hiddenGroups":["list|Local Hidden"],"groupOrder":["list|Local First"],"groupOrderSchema":3,"hiddenChannels":["list:1"],"channelOrder":["list:2"]}}}"""
+        val remote = """{"iptvByProfile":{"main":{"hiddenGroups":["list|Remote Hidden"],"groupOrder":["list|Remote First"],"groupOrderSchema":3,"hiddenChannels":["list:9"],"channelOrder":["list:8","list:7"]}}}"""
 
         val merged = JSONObject(mergeRemoteIptvGroupPreferences(local, remote, emptySet()))
             .getJSONObject("iptvByProfile")
@@ -219,8 +219,11 @@ class CloudSyncRepositoryAddonMergeTest {
 
         assertEquals("list|Remote Hidden", merged.getJSONArray("hiddenGroups").getString(0))
         assertEquals("list|Remote First", merged.getJSONArray("groupOrder").getString(0))
+        assertEquals("list:9", merged.getJSONArray("hiddenChannels").getString(0))
+        assertEquals("list:8", merged.getJSONArray("channelOrder").getString(0))
         assertEquals("list|Local Hidden", locallyDirty.getJSONArray("hiddenGroups").getString(0))
         assertEquals("list|Local First", locallyDirty.getJSONArray("groupOrder").getString(0))
+        assertEquals("list:1", locallyDirty.getJSONArray("hiddenChannels").getString(0))
     }
 
     @Test

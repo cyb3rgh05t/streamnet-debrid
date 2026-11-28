@@ -590,7 +590,10 @@ export interface AppSettings {
   /** Read from cloud; locked IPTV groups are not exposed without a PIN flow. */
   lockedIptvGroupIds?: string[];
   groupOrder: string[];
-  // Metadata & API Keys
+  /** Channels hidden from every Live TV category (cloud references, shared with Android). */
+  hiddenChannelIds?: string[];
+  /** Custom channel sequence inside a category; ranked channels come first. */
+  channelOrder?: string[];
   customTmdbApiKey: string;
   customTvdbApiKey: string;
   customTvdbUserPin: string;

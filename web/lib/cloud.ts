@@ -106,6 +106,8 @@ interface AndroidIptvProfileState {
   favoriteChannels?: string[];
   favoriteGroups?: string[];
   hiddenGroups?: string[];
+  hiddenChannels?: string[];
+  channelOrder?: string[];
   groupOrder?: string[];
   sortOrder?: string;
 }
@@ -793,6 +795,8 @@ function iptvFromAndroid(
         ? stringArray(state.favoriteGroups)
         : stringArray(rootState.iptvFavoriteGroups),
     hiddenGroupIds: stringArray(state.hiddenGroups),
+    hiddenChannelIds: stringArray(state.hiddenChannels),
+    channelOrder: stringArray(state.channelOrder),
     lockedIptvGroupIds: stringArray(state.lockedGroups),
     groupOrder: stringArray(state.groupOrder),
     iptvSortOrder:
@@ -1368,10 +1372,19 @@ function androidIptvSettings(settings: AppSettings): Record<string, unknown> {
     tvSession: normalizeTvSession(settings.iptvTvSession),
     favoriteGroups: settings.favoriteGroupIds,
     hiddenGroups: settings.hiddenGroupIds,
+    hiddenChannels: settings.hiddenChannelIds ?? [],
+    channelOrder: settings.channelOrder ?? [],
     groupOrder: settings.groupOrder,
     sortOrder: settings.iptvSortOrder ?? "provider",
   };
 }
+
+const GROUP_PREFERENCE_FIELDS = new Set([
+  "hiddenGroups",
+  "groupOrder",
+  "hiddenChannels",
+  "channelOrder",
+]);
 
 function mergeFavoriteEdits(
   remote: string[],
@@ -1399,8 +1412,10 @@ export function mergeIptvSettings(
   const incoming = androidIptvSettings(settings);
   const base = baseline ? androidIptvSettings(baseline) : null;
   const merged = { ...existing };
+  let groupPreferencesChanged = false;
   for (const [field, value] of Object.entries(incoming)) {
     if (base && sameFieldValue(value, base[field])) continue;
+    if (GROUP_PREFERENCE_FIELDS.has(field)) groupPreferencesChanged = true;
     if (field === "tvSession") {
       merged[field] = mergeTvSessions(existing[field], value);
       continue;
@@ -1416,6 +1431,9 @@ export function mergeIptvSettings(
           )
         : value;
   }
+  // Android resolves hidden/ordered groups and channels by this stamp; without it a newer web edit
+  // would lose against any older local change on the phone.
+  if (groupPreferencesChanged) merged.groupPreferencesUpdatedAt = Date.now();
   return merged;
 }
 

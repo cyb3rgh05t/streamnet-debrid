@@ -86,6 +86,8 @@ fun ChannelRow(
     onFocused: () -> Unit = {},
     variantCount: Int = 1,
     onOpenVariants: () -> Unit = {},
+    // When set, a long press (touch hold, held OK or the Menu key) opens this instead of toggling the favorite.
+    onLongPress: (() -> Unit)? = null,
     rowHeight: androidx.compose.ui.unit.Dp = LiveDims.EpgRowHeight,
     compact: Boolean = false,
     forceFocused: Boolean = false,
@@ -168,20 +170,23 @@ fun ChannelRow(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
-                    if (variantCount > 1) onOpenVariants() else onFavoriteToggle()
+                    if (onLongPress != null) onLongPress()
+                    else if (variantCount > 1) onOpenVariants() else onFavoriteToggle()
                 },
             )
             // Compose's combinedClickable doesn't catch DPAD long-press on
             // every TV — the key repeats before the long-click threshold
             // fires. Catch it here explicitly: the first repeat (native
-            // repeatCount == 1) on CENTER / ENTER / MENU triggers favorite
-            // toggle, giving the user the "hold OK" gesture everywhere.
+            // repeatCount == 1) on CENTER / ENTER / MENU triggers the long
+            // press action, giving the user the "hold OK" gesture everywhere.
             .onKeyEvent { ev ->
                 val isLongHoldCenter = ev.type == KeyEventType.KeyDown &&
                     (ev.key == Key.DirectionCenter || ev.key == Key.Enter) &&
                     ev.nativeKeyEvent.repeatCount == 1
                 val isMenu = ev.type == KeyEventType.KeyDown && ev.key == Key.Menu
-                if (isMenu && variantCount > 1) {
+                if (onLongPress != null && (isLongHoldCenter || isMenu)) {
+                    onLongPress(); true
+                } else if (isMenu && variantCount > 1) {
                     onOpenVariants(); true
                 } else if (isLongHoldCenter || isMenu) {
                     onFavoriteToggle(); true

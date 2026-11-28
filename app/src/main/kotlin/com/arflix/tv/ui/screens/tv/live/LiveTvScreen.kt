@@ -93,6 +93,7 @@ import com.arflix.tv.data.model.IptvNowNext
 import com.arflix.tv.data.model.IptvProgram
 import com.arflix.tv.data.model.Profile
 import com.arflix.tv.data.repository.IptvPlaybackTarget
+import com.arflix.tv.data.repository.applyIptvChannelPreferences
 import com.arflix.tv.ui.screens.tv.TvUiState
 import com.arflix.tv.ui.screens.tv.TvViewModel
 import com.arflix.tv.network.OkHttpProvider
@@ -694,6 +695,8 @@ fun LiveTvScreen(
     val recents = remember { mutableStateOf<LinkedHashSet<String>>(LinkedHashSet()) }
     val favSet = remember(state.snapshot.favoriteChannels) { state.snapshot.favoriteChannels.toSet() }
     val hiddenGroupSet = remember(state.snapshot.hiddenGroups) { state.snapshot.hiddenGroups.toSet() }
+    val hiddenChannelSet by viewModel.hiddenChannelIds.collectAsStateWithLifecycle()
+    val channelOrder by viewModel.channelOrder.collectAsStateWithLifecycle()
     LaunchedEffect(state.tvSession.recentChannelIds, state.tvSession.lastChannelId) {
         val persistedRecents = state.tvSession.recentChannelIds
             .ifEmpty { listOfNotNull(state.tvSession.lastChannelId.takeIf { it.isNotBlank() }) }
@@ -1085,12 +1088,20 @@ fun LiveTvScreen(
         }
         visibleEnrichedState.value = EnrichedChannels(all = visibleChannels, tree = tree, index = index)
     }
-    LaunchedEffect(hiddenGroupSet, selectedCategoryId, visibleEnrichedState.value.tree, state.config.showSpecialCategories) {
+    // The category tree is rebuilt in stages while the channel list loads. A saved category that is
+    // not in an early stage yet must not be replaced by a fallback; give the full list time (bounded).
+    var categoryRestoreGraceExpired by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(8_000L)
+        categoryRestoreGraceExpired = true
+    }
+    val categoryRestoreSettled = (state.channelsBootstrapped && !state.isLoading) || categoryRestoreGraceExpired
+    LaunchedEffect(hiddenGroupSet, selectedCategoryId, visibleEnrichedState.value.tree, state.config.showSpecialCategories, categoryRestoreSettled) {
         val loaded = visibleEnrichedState.value
         val tree = loaded.tree
         val validated = LiveTvStartup.validatedCategoryId(
             selectedId = selectedCategoryId,
-            treeLoaded = loaded !== EnrichedChannels.Empty,
+            treeLoaded = loaded !== EnrichedChannels.Empty && categoryRestoreSettled,
             categoryExists = tree.byId(selectedCategoryId) != null,
             categoryHidden = tree.hidden.categories.any { it.id == selectedCategoryId },
             showSpecialCategories = state.config.showSpecialCategories,
@@ -1121,6 +1132,17 @@ fun LiveTvScreen(
     // recents remain ordered dynamic lists, but they are simple id lookups.
     val filteredChannelsState = remember { mutableStateOf<List<EnrichedChannel>>(emptyList()) }
     var filteredChannelsCategoryKey by remember { mutableStateOf<String?>(null) }
+    // Channels of the loaded window that the user hid; keeps the paging total in step with what is shown.
+    var hiddenRemovedCount by remember { mutableIntStateOf(0) }
+    var channelMenuTarget by remember { mutableStateOf<EnrichedChannel?>(null) }
+    val displayTree = remember(visibleEnrichedState.value.tree, hiddenChannelSet.size) {
+        visibleEnrichedState.value.tree.withHiddenChannelsCategory(hiddenChannelSet.size)
+    }
+    LaunchedEffect(hiddenChannelSet.isEmpty(), selectedCategoryId) {
+        if (hiddenChannelSet.isEmpty() && selectedCategoryId == HIDDEN_CHANNELS_CATEGORY_ID) {
+            selectedCategoryId = "all"
+        }
+    }
     val recentsFilterKey = if (selectedCategoryId == "recent") recents.value else Unit
     LaunchedEffect(
         visibleEnrichedState.value.index,
@@ -1130,7 +1152,27 @@ fun LiveTvScreen(
         recentsFilterKey,
         pagedLoadedLimit,
         state.snapshot.sortOrder,
+        hiddenChannelSet,
+        channelOrder,
     ) {
+        if (selectedCategoryId == HIDDEN_CHANNELS_CATEGORY_ID) {
+            val index = visibleEnrichedState.value.index
+            val hiddenIds = hiddenChannelSet.toList()
+            val indexed = hiddenIds.mapNotNull { index.byId[it] }
+            val rows = if (indexed.size < hiddenIds.size && viewModel.iptvRepository.pagedChannelsReady()) {
+                val known = indexed.mapTo(HashSet()) { it.id }
+                val extra = withContext(Dispatchers.IO) {
+                    viewModel.iptvRepository.pagedChannelsByIds(hiddenIds.filterNot { it in known })
+                }
+                indexed + extra.mapIndexed { position, channel -> channel.enrichForFastStartup(indexed.size + position + 1) }
+            } else {
+                indexed
+            }
+            filteredChannelsCategoryKey = selectedCategoryId
+            hiddenRemovedCount = 0
+            filteredChannelsState.value = rows
+            return@LaunchedEffect
+        }
         val tree = visibleEnrichedState.value.tree
         val categoryCount = tree.countForCategory(selectedCategoryId) ?: 0
         var result = withContext(Dispatchers.Default) {
@@ -1215,7 +1257,17 @@ fun LiveTvScreen(
             return@LaunchedEffect
         }
         filteredChannelsCategoryKey = selectedCategoryId
-        filteredChannelsState.value = sortChannelsByConfiguredOrder(result, state.snapshot.sortOrder)
+        val preferred = withContext(Dispatchers.Default) {
+            applyIptvChannelPreferences(
+                channels = sortChannelsByConfiguredOrder(result, state.snapshot.sortOrder),
+                hiddenIds = hiddenChannelSet,
+                savedOrder = channelOrder,
+                applyOrder = isChannelOrderCategory(selectedCategoryId),
+                idOf = { it.id },
+            )
+        }
+        hiddenRemovedCount = result.size - preferred.size
+        filteredChannelsState.value = preferred
     }
     val visibleChannels = visibleEnrichedState.value.all
     // Variant grouping + collapsing + index building are O(channels). Doing them
@@ -1238,10 +1290,15 @@ fun LiveTvScreen(
     val filteredChannelIndexById = channelLists.filteredChannelIndexById
     val liveTvGuideContent: @Composable () -> Unit = {
     val indexedGuideNowNextState = remember { mutableStateOf<Map<String, IptvNowNext>>(emptyMap()) }
-    val selectedCategoryTotalCount = remember(visibleEnrichedState.value.tree, selectedCategoryId, filteredChannels.size) {
-        visibleEnrichedState.value.tree.countForCategory(selectedCategoryId)
-            ?.takeIf { it > 0 }
-            ?: filteredChannels.size
+    val selectedCategoryTotalCount = remember(visibleEnrichedState.value.tree, selectedCategoryId, filteredChannels.size, hiddenRemovedCount) {
+        if (selectedCategoryId == HIDDEN_CHANNELS_CATEGORY_ID) {
+            filteredChannels.size
+        } else {
+            visibleEnrichedState.value.tree.countForCategory(selectedCategoryId)
+                ?.takeIf { it > 0 }
+                ?.let { (it - hiddenRemovedCount).coerceAtLeast(filteredChannels.size) }
+                ?: filteredChannels.size
+        }
     }
     val visibleChannelsById = visibleEnrichedState.value.index.byId
     fun guideForChannel(channel: EnrichedChannel?): IptvNowNext? {
@@ -1831,6 +1888,7 @@ fun LiveTvScreen(
         state.tvSession.lastGroupName,
         state.tvSession.lastChannelId,
         startupCategoryApplied,
+        categoryRestoreSettled,
     ) {
         val tree = visibleEnrichedState.value.tree
         if (startupCategoryApplied || !state.tvSessionLoaded || !state.iptvPreferencesLoaded || tree.top.isEmpty()) {
@@ -1851,6 +1909,9 @@ fun LiveTvScreen(
             else -> null
         }
 
+        if (LiveTvStartup.categoryRestoreMustWait(restoredCategoryId, state.tvSession.lastGroupName, categoryRestoreSettled)) {
+            return@LaunchedEffect
+        }
         val nextCategoryId = restoredCategoryId ?: firstPlaylistCategoryId(tree)
         if (selectedCategoryId != nextCategoryId) {
             selectedCategoryId = nextCategoryId
@@ -1924,8 +1985,8 @@ fun LiveTvScreen(
     // The Netflix layout only offers a subset of the classic categories (no country / genre
     // sub-entries). A category saved by the classic layout would leave no chip active, so map it to
     // the closest category that has one (the playing channel's playlist group, else "All").
-    LaunchedEffect(useNetflixLayout, visibleEnrichedState.value.tree, selectedCategoryId, startupCategoryApplied, playingChannel?.id) {
-        if (!useNetflixLayout || !startupCategoryApplied) return@LaunchedEffect
+    LaunchedEffect(useNetflixLayout, visibleEnrichedState.value.tree, selectedCategoryId, startupCategoryApplied, playingChannel?.id, categoryRestoreSettled) {
+        if (!useNetflixLayout || !startupCategoryApplied || !categoryRestoreSettled) return@LaunchedEffect
         val tree = visibleEnrichedState.value.tree
         if (tree.top.isEmpty() && tree.global.categories.isEmpty()) return@LaunchedEffect
         val mapped = netflixCategoryFor(selectedCategoryId, tree, playingChannel)
@@ -3432,7 +3493,7 @@ fun LiveTvScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     TouchCategoryRail(
-                        tree = visibleEnrichedState.value.tree,
+                        tree = displayTree,
                         selectedId = selectedCategoryId,
                         onSelect = { id ->
                             noteGuideUserNavigation()
@@ -3469,6 +3530,7 @@ fun LiveTvScreen(
                         favorites = favSet,
                         variantCountFor = { channel -> variantCountFor(channel, variantGroups) },
                         onOpenVariants = { channel -> openVariantPicker(channel) },
+                        onChannelMenu = { channel -> channelMenuTarget = channel },
                         onMoveLeftFromChannels = { focusPlaylistSearch() },
                         onEnterEpg = { channel -> focusEpg(channel.id) },
                         onExitEpg = { channel -> focusChannelList(channel?.id ?: focusedChannelId ?: playingChannelId) },
@@ -3520,7 +3582,7 @@ fun LiveTvScreen(
                     compactTouchLayout = compactTouchLayout,
                     landscapeCompactMiniPlayer = landscapeCompactMiniPlayer,
                     tabletLandscapeMiniPlayer = tabletLandscapeMiniPlayer,
-                    tree = visibleEnrichedState.value.tree,
+                    tree = displayTree,
                     selectedCategoryId = selectedCategoryId,
                     sidebarExpanded = sidebarExpanded,
                     sidebarListState = sidebarListState,
@@ -3585,10 +3647,11 @@ fun LiveTvScreen(
                     onRequestPreviousChannels = ::requestGuideWindowBefore,
                     onRequestNextChannels = ::requestGuideWindowAfter,
                     contentTopPadding = contentTopPadding,
+                    onChannelMenu = { channel -> channelMenuTarget = channel },
                 )
             } else {
                 LiveTvNetflixLayout(
-                    tree = visibleEnrichedState.value.tree,
+                    tree = displayTree,
                     selectedCategoryId = selectedCategoryId,
                     hiddenGroups = hiddenGroupSet,
                     groupOrder = state.snapshot.groupOrder,
@@ -3645,6 +3708,20 @@ fun LiveTvScreen(
                     onChannelSelected = { ch -> selectChannel(ch) },
                     onFavoriteToggle = { id -> viewModel.toggleFavoriteChannel(id) },
                     onOpenVariants = { ch -> openVariantPicker(ch) },
+                    onChannelMenu = { ch -> channelMenuTarget = ch },
+                    onHideCategory = { playlistId, groupName ->
+                        noteGuideUserNavigation()
+                        selectedCategoryId = "all"
+                        focusSelectedCategorySignal += 1
+                        viewModel.toggleHiddenGroup(playlistId, groupName)
+                    },
+                    onUnhideCategory = { playlistId, groupName ->
+                        noteGuideUserNavigation()
+                        viewModel.toggleHiddenGroup(playlistId, groupName)
+                    },
+                    onMoveCategoryUp = { playlistId, groupName -> viewModel.moveGroupUp(playlistId, groupName) },
+                    onMoveCategoryToTop = { playlistId, groupName -> viewModel.moveGroupToTop(playlistId, groupName) },
+                    onMoveCategoryDown = { playlistId, groupName -> viewModel.moveGroupDown(playlistId, groupName) },
                     onMoveUpFromCategory = {
                         topBarFocusIndex = topBarSelectedIndex(SidebarItem.TV, hasProfile, hasOfflineDownloads)
                             .coerceIn(0, maxTopBarIndex)
@@ -4080,7 +4157,10 @@ fun LiveTvScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             SearchOverlay(
-                channels = allDisplayChannels,
+                channels = remember(allDisplayChannels, hiddenChannelSet) {
+                    if (hiddenChannelSet.isEmpty()) allDisplayChannels
+                    else allDisplayChannels.filterNot { it.id in hiddenChannelSet }
+                },
                 nowNext = effectiveGuideNowNext,
                 guideProvider = { ids ->
                     viewModel.iptvRepository.indexedGuideWindow(
@@ -4094,6 +4174,7 @@ fun LiveTvScreen(
                         .pagedSearchChannels(query, limit = 200)
                         .asSequence()
                         .filterNot { channel -> isAdultGroup(channel.group, channel.name) }
+                        .filterNot { channel -> channel.id in hiddenChannelSet }
                         .filterNot { channel ->
                             val playlistId = channel.id.substringBefore(':')
                             val groupKey = com.arflix.tv.data.model.PlaylistGroupKey
@@ -4123,6 +4204,23 @@ fun LiveTvScreen(
                 onDismiss = { variantPickerChannel = null },
                 onPick = { playVariant(it) },
             )
+            channelMenuTarget?.let { target ->
+                ChannelContextMenu(
+                    channel = target,
+                    isFavorite = target.id in favSet,
+                    hasVariants = variantCountFor(target, variantGroups) > 1,
+                    canMove = isChannelOrderCategory(selectedCategoryId),
+                    inHiddenChannels = selectedCategoryId == HIDDEN_CHANNELS_CATEGORY_ID,
+                    horizontal = useNetflixLayout,
+                    onToggleFavorite = { viewModel.toggleFavoriteChannel(target.id) },
+                    onOpenVariants = { openVariantPicker(target) },
+                    onMoveToTop = { viewModel.moveChannelToTop(target.id, filteredChannels.map { it.id }) },
+                    onMoveUp = { viewModel.moveChannelUp(target.id, filteredChannels.map { it.id }) },
+                    onMoveDown = { viewModel.moveChannelDown(target.id, filteredChannels.map { it.id }) },
+                    onToggleHidden = { viewModel.toggleHiddenChannel(target.id) },
+                    onDismiss = { channelMenuTarget = null },
+                )
+            }
         }
 
         ChannelNumberOverlay(

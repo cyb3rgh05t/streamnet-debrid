@@ -138,4 +138,17 @@ object LiveTvStartup {
         !categoryExists || categoryHidden -> fallbackId
         else -> selectedId
     }
+
+    /**
+     * Whether restoring the saved category has to wait for more channels.
+     *
+     * The first category tree is built from a small startup slice, so a saved playlist group can be
+     * missing from it only because the full list is still loading. Settling on a fallback then (with
+     * "All Channels" selectable, as with special categories on) discarded the saved category for good.
+     */
+    fun categoryRestoreMustWait(
+        restoredCategoryId: String?,
+        savedCategoryName: String,
+        channelsSettled: Boolean,
+    ): Boolean = restoredCategoryId == null && savedCategoryName.isNotBlank() && !channelsSettled
 }

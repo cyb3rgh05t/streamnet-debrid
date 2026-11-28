@@ -25,7 +25,16 @@ import {
   Tv,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  type TouchEvent as ReactTouchEvent,
+} from "react";
 import { externalLaunchMode, openExternalPlayer } from "@/lib/externalPlayers";
 import {
   accessibleChannels,
@@ -40,9 +49,14 @@ import { VirtualList } from "@/components/ui/VirtualList";
 import { SportsGuidePane } from "@/components/livetv/SportsGuidePane";
 import { ChannelLogo } from "@/components/livetv/ChannelLogo";
 import {
+  applyChannelPreferences,
   channelIdentityIndex,
+  channelPreferenceId,
+  hiddenChannelIdSet,
   normalizeTvSession,
+  reorderChannelOrder,
   resolveChannelReferences,
+  type ChannelMove,
 } from "@/lib/iptvSession";
 import { IPTV_SNAPSHOT_TTL_MS, iptvPlaylistSignature } from "@/lib/iptv";
 import { loadStored, saveStored } from "@/lib/storage";
@@ -55,6 +69,13 @@ const GUIDE_BATCH_DELAY_MS = 500;
 const GUIDE_WINDOW_HOURS = 12;
 const GUIDE_PX_PER_MIN = 6;
 const rowKey = (item: { id: string }) => item.id;
+const HIDDEN_CHANNELS_CATEGORY = "hidden-channels";
+
+// Recently watched is ordered by time; the hidden-channels list is a management view and Sports has no channel list.
+const canReorderCategory = (category: string) =>
+  category !== "recent" &&
+  category !== HIDDEN_CHANNELS_CATEGORY &&
+  category !== "sports";
 
 function fmtTime(ms: number): string {
   try {
@@ -163,6 +184,19 @@ export function LiveTvScreen() {
     loading: boolean;
   } | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [channelMenu, setChannelMenu] = useState<{
+    channel: IptvChannel;
+    x: number;
+    y: number;
+  } | null>(null);
+  const openChannelMenu = useCallback(
+    (channel: IptvChannel, x: number, y: number) => {
+      setSelectedChannelId(channel.id);
+      setChannelMenu({ channel, x, y });
+    },
+    [],
+  );
+  const closeChannelMenu = useCallback(() => setChannelMenu(null), []);
   const tvSession = useMemo(
     () => normalizeTvSession(settings.iptvTvSession),
     [settings.iptvTvSession],
@@ -191,6 +225,12 @@ export function LiveTvScreen() {
     return result;
   }, [channels]);
   const channelById = useMemo(() => channelIdentityIndex(channels), [channels]);
+  const hiddenChannelRefs = settings.hiddenChannelIds;
+  const channelOrderRefs = settings.channelOrder;
+  const hiddenChannelIds = useMemo(
+    () => hiddenChannelIdSet(hiddenChannelRefs ?? [], channelById),
+    [hiddenChannelRefs, channelById],
+  );
   const enabledPlaylists = useMemo(
     () =>
       playlists.filter(
@@ -267,7 +307,8 @@ export function LiveTvScreen() {
       .map(([group, items]) => ({
         id: `group:${group}`,
         label: groupLabel(items[0]?.group ?? group, settings.uiLanguage),
-        count: items.length,
+        count: items.filter((channel) => !hiddenChannelIds.has(channel.id))
+          .length,
         favorite:
           favoriteGroups.includes(group) ||
           Boolean(items[0] && favoriteGroups.includes(groupKey(items[0]))),
@@ -290,7 +331,9 @@ export function LiveTvScreen() {
       {
         id: "favorites",
         label: localize(settings.uiLanguage, "Favoriten", "Favorites"),
-        count: favoriteChannels.length,
+        count: favoriteChannels.filter(
+          (channel) => !hiddenChannelIds.has(channel.id),
+        ).length,
         favorite: true,
         hidden: false,
       },
@@ -301,14 +344,16 @@ export function LiveTvScreen() {
           "Zuletzt angesehen",
           "Recently Watched",
         ),
-        count: recentChannels.length,
+        count: recentChannels.filter(
+          (channel) => !hiddenChannelIds.has(channel.id),
+        ).length,
         favorite: false,
         hidden: false,
       },
       {
         id: "all",
         label: localize(settings.uiLanguage, "Alle Sender", "All Channels"),
-        count: channels.length,
+        count: channels.length - hiddenChannelIds.size,
         favorite: false,
         hidden: false,
       },
@@ -319,15 +364,31 @@ export function LiveTvScreen() {
         favorite: false,
         hidden: false,
       },
+      ...(hiddenChannelIds.size
+        ? [
+            {
+              id: HIDDEN_CHANNELS_CATEGORY,
+              label: localize(
+                settings.uiLanguage,
+                "Ausgeblendete Sender",
+                "Hidden channels",
+              ),
+              count: hiddenChannelIds.size,
+              favorite: false,
+              hidden: false,
+            },
+          ]
+        : []),
       ...groupRows,
     ];
   }, [
     channels.length,
-    favoriteChannels.length,
-    recentChannels.length,
+    favoriteChannels,
+    recentChannels,
     favoriteGroups,
     groups,
     hiddenGroups,
+    hiddenChannelIds,
     settings.groupOrder,
     settings.iptvSortOrder,
     settings.uiLanguage,
@@ -335,13 +396,15 @@ export function LiveTvScreen() {
 
   const visibleChannels = useMemo(() => {
     const base =
-      activeCategory === "favorites"
-        ? favoriteChannels
-        : activeCategory === "recent"
-          ? recentChannels
-          : activeCategory.startsWith("group:")
-            ? (groups[activeCategory.slice(6)] ?? [])
-            : channels;
+      activeCategory === HIDDEN_CHANNELS_CATEGORY
+        ? resolveChannelReferences(hiddenChannelRefs ?? [], channelById)
+        : activeCategory === "favorites"
+          ? favoriteChannels
+          : activeCategory === "recent"
+            ? recentChannels
+            : activeCategory.startsWith("group:")
+              ? (groups[activeCategory.slice(6)] ?? [])
+              : channels;
     const needle = query.trim().toLowerCase();
     const filtered = needle
       ? base.filter(
@@ -352,30 +415,49 @@ export function LiveTvScreen() {
         )
       : base;
     const sortMode = settings.iptvSortOrder ?? "provider";
-    if (activeCategory === "favorites" || activeCategory === "recent")
-      return filtered;
-    if (sortMode === "number") {
-      return [...filtered].sort((a, b) => {
-        const numA = a.number
-          ? parseInt(a.number, 10)
-          : Number.MAX_SAFE_INTEGER;
-        const numB = b.number
-          ? parseInt(b.number, 10)
-          : Number.MAX_SAFE_INTEGER;
-        if (numA !== numB) return numA - numB;
-        return a.name.localeCompare(b.name);
-      });
-    }
-    if (sortMode === "name") {
-      return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
-    }
-    return filtered;
+    if (activeCategory === HIDDEN_CHANNELS_CATEGORY) return filtered;
+    if (activeCategory === "recent")
+      return applyChannelPreferences(
+        filtered,
+        hiddenChannelIds,
+        [],
+        false,
+        channelById,
+      );
+    const sorted =
+      activeCategory === "favorites"
+        ? filtered
+        : sortMode === "number"
+        ? [...filtered].sort((a, b) => {
+            const numA = a.number
+              ? parseInt(a.number, 10)
+              : Number.MAX_SAFE_INTEGER;
+            const numB = b.number
+              ? parseInt(b.number, 10)
+              : Number.MAX_SAFE_INTEGER;
+            if (numA !== numB) return numA - numB;
+            return a.name.localeCompare(b.name);
+          })
+        : sortMode === "name"
+          ? [...filtered].sort((a, b) => a.name.localeCompare(b.name))
+          : filtered;
+    return applyChannelPreferences(
+      sorted,
+      hiddenChannelIds,
+      channelOrderRefs ?? [],
+      canReorderCategory(activeCategory),
+      channelById,
+    );
   }, [
     activeCategory,
     channels,
+    channelById,
     favoriteChannels,
     recentChannels,
     groups,
+    hiddenChannelRefs,
+    hiddenChannelIds,
+    channelOrderRefs,
     query,
     settings.iptvSortOrder,
   ]);
@@ -528,6 +610,28 @@ export function LiveTvScreen() {
         : [id, ...hiddenGroups],
     });
   };
+
+  const toggleHiddenChannel = (channel: IptvChannel) => {
+    const current = settings.hiddenChannelIds ?? [];
+    setSettings({
+      ...settings,
+      hiddenChannelIds: hiddenChannelIds.has(channel.id)
+        ? current.filter((ref) => channelById.get(ref)?.id !== channel.id)
+        : [channelPreferenceId(channel), ...current],
+    });
+  };
+
+  const canReorder = canReorderCategory(activeCategory) && !query.trim();
+  const moveChannel = (channel: IptvChannel, move: ChannelMove) =>
+    setSettings({
+      ...settings,
+      channelOrder: reorderChannelOrder(
+        settings.channelOrder ?? [],
+        renderedChannels.map(channelPreferenceId),
+        channelPreferenceId(channel),
+        move,
+      ),
+    });
 
   const addPlaylist = () => {
     if (!url.trim()) {
@@ -1374,6 +1478,7 @@ export function LiveTvScreen() {
                           onVisible={() => requestGuide(channel)}
                           onPlay={() => watchChannel(channel)}
                           onToggleFavorite={() => toggleFavorite(channel.id)}
+                          onMenu={(x, y) => openChannelMenu(channel, x, y)}
                         />
                       )}
                     />
@@ -1389,6 +1494,7 @@ export function LiveTvScreen() {
                     onVisible={requestGuide}
                     onPlay={watchChannel}
                     onCatchup={playCatchup}
+                    onMenu={openChannelMenu}
                   />
                 )}
               </>
@@ -1490,6 +1596,47 @@ export function LiveTvScreen() {
                       </div>
                     )}
                     <div className="livetv-detail-actions">
+                      <button
+                        type="button"
+                        className={
+                          hiddenChannelIds.has(selectedChannel.id)
+                            ? "secondary livetv-action-icon is-active"
+                            : "secondary livetv-action-icon"
+                        }
+                        aria-label={
+                          hiddenChannelIds.has(selectedChannel.id)
+                            ? localize(
+                                settings.uiLanguage,
+                                "Sender einblenden",
+                                "Unhide channel",
+                              )
+                            : localize(
+                                settings.uiLanguage,
+                                "Sender ausblenden",
+                                "Hide channel",
+                              )
+                        }
+                        title={
+                          hiddenChannelIds.has(selectedChannel.id)
+                            ? localize(
+                                settings.uiLanguage,
+                                "Sender einblenden",
+                                "Unhide channel",
+                              )
+                            : localize(
+                                settings.uiLanguage,
+                                "Sender ausblenden",
+                                "Hide channel",
+                              )
+                        }
+                        onClick={() => toggleHiddenChannel(selectedChannel)}
+                      >
+                        {hiddenChannelIds.has(selectedChannel.id) ? (
+                          <Eye size={17} />
+                        ) : (
+                          <EyeOff size={17} />
+                        )}
+                      </button>
                       {favoriteIds.has(selectedChannel.id) && (
                         <>
                           <button
@@ -1717,6 +1864,188 @@ export function LiveTvScreen() {
           </p>
         </section>
       )}
+      {channelMenu && (
+        <ChannelContextMenu
+          x={channelMenu.x}
+          y={channelMenu.y}
+          language={settings.uiLanguage}
+          favorite={favoriteIds.has(channelMenu.channel.id)}
+          hidden={hiddenChannelIds.has(channelMenu.channel.id)}
+          canReorder={canReorder}
+          onClose={closeChannelMenu}
+          onToggleFavorite={() => toggleFavorite(channelMenu.channel.id)}
+          onMove={(move) => moveChannel(channelMenu.channel, move)}
+          onToggleHidden={() => toggleHiddenChannel(channelMenu.channel)}
+        />
+      )}
+    </div>
+  );
+}
+
+function useChannelMenuTrigger(onMenu: (x: number, y: number) => void) {
+  const timer = useRef<number | null>(null);
+  const fired = useRef(false);
+  const clear = () => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+  };
+  return {
+    // Right click, the keyboard menu key and the touch long press all end up here.
+    onContextMenu: (event: ReactMouseEvent) => {
+      event.preventDefault();
+      clear();
+      onMenu(event.clientX, event.clientY);
+    },
+    onTouchStart: (event: ReactTouchEvent) => {
+      clear();
+      fired.current = false;
+      const touch = event.touches[0];
+      if (!touch) return;
+      timer.current = window.setTimeout(() => {
+        timer.current = null;
+        fired.current = true;
+        // Touch browsers may not send a click after the long press, so do not keep swallowing clicks.
+        window.setTimeout(() => {
+          fired.current = false;
+        }, 700);
+        onMenu(touch.clientX, touch.clientY);
+      }, 550);
+    },
+    onTouchMove: clear,
+    onTouchEnd: clear,
+    onTouchCancel: clear,
+    // The release of a long press must not also start playback.
+    onClickCapture: (event: ReactMouseEvent) => {
+      if (!fired.current) return;
+      fired.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+  };
+}
+
+function ChannelContextMenu({
+  x,
+  y,
+  language,
+  favorite,
+  hidden,
+  canReorder,
+  onClose,
+  onToggleFavorite,
+  onMove,
+  onToggleHidden,
+}: {
+  x: number;
+  y: number;
+  language: "de" | "en";
+  favorite: boolean;
+  hidden: boolean;
+  canReorder: boolean;
+  onClose: () => void;
+  onToggleFavorite: () => void;
+  onMove: (move: ChannelMove) => void;
+  onToggleHidden: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const dismiss = (event: Event) => {
+      if (!menuRef.current?.contains(event.target as Node)) onClose();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onClose, true);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onClose, true);
+    };
+  }, [onClose]);
+
+  const run = (action: () => void) => () => {
+    action();
+    onClose();
+  };
+  const items: Array<{ label: string; icon: ReactNode; action: () => void }> =
+    hidden
+      ? [
+          {
+            label: localize(language, "Sender einblenden", "Unhide channel"),
+            icon: <Eye size={15} />,
+            action: onToggleHidden,
+          },
+        ]
+      : [
+          {
+            label: favorite
+              ? localize(language, "Aus Favoriten entfernen", "Remove favorite")
+              : localize(language, "Zu Favoriten hinzufügen", "Add favorite"),
+            icon: <Star size={15} fill={favorite ? "currentColor" : "none"} />,
+            action: onToggleFavorite,
+          },
+          ...(canReorder
+            ? [
+                {
+                  label: localize(language, "Ganz nach oben", "Move to top"),
+                  icon: <ArrowUp size={15} />,
+                  action: () => onMove("top"),
+                },
+                {
+                  label: localize(language, "Nach oben", "Move up"),
+                  icon: <ArrowUp size={15} />,
+                  action: () => onMove("up"),
+                },
+                {
+                  label: localize(language, "Nach unten", "Move down"),
+                  icon: <ArrowDown size={15} />,
+                  action: () => onMove("down"),
+                },
+              ]
+            : []),
+          {
+            label: localize(language, "Sender ausblenden", "Hide channel"),
+            icon: <EyeOff size={15} />,
+            action: onToggleHidden,
+          },
+        ];
+
+  return (
+    <div
+      ref={menuRef}
+      className="livetv-context-menu"
+      role="menu"
+      style={{
+        left: Math.max(8, Math.min(x, window.innerWidth - 232)),
+        top: Math.max(8, Math.min(y, window.innerHeight - 56 * items.length)),
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+        event.preventDefault();
+        event.stopPropagation();
+        const buttons = Array.from(
+          event.currentTarget.querySelectorAll<HTMLButtonElement>("button"),
+        );
+        const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const next =
+          buttons[(index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length];
+        next?.focus();
+      }}
+    >
+      {items.map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          role="menuitem"
+          onClick={run(item.action)}
+        >
+          {item.icon}
+          {item.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -1749,6 +2078,7 @@ function GuideGrid({
   onVisible,
   onPlay,
   onCatchup,
+  onMenu,
 }: {
   channels: IptvChannel[];
   favorites: Set<string>;
@@ -1758,6 +2088,7 @@ function GuideGrid({
   onVisible: (channel: IptvChannel) => void;
   onPlay: (channel: IptvChannel) => void;
   onCatchup: (channel: IptvChannel, program: IptvProgram) => void;
+  onMenu: (channel: IptvChannel, x: number, y: number) => void;
 }) {
   const { settings } = useApp();
   const [clock, setClock] = useState(0);
@@ -1910,6 +2241,7 @@ function GuideGrid({
             onVisible={() => onVisible(channel)}
             onPlay={() => onPlay(channel)}
             onCatchup={(program) => onCatchup(channel, program)}
+            onMenu={(x, y) => onMenu(channel, x, y)}
           />
         )}
       />
@@ -1930,6 +2262,7 @@ function GuideRow({
   onVisible,
   onPlay,
   onCatchup,
+  onMenu,
 }: {
   channel: IptvChannel;
   favorite: boolean;
@@ -1943,8 +2276,10 @@ function GuideRow({
   onVisible: () => void;
   onPlay: () => void;
   onCatchup: (program: IptvProgram) => void;
+  onMenu: (x: number, y: number) => void;
 }) {
   const { settings, iptvGuideSettled } = useApp();
+  const menuTrigger = useChannelMenuTrigger(onMenu);
   const rowRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = rowRef.current;
@@ -1995,6 +2330,7 @@ function GuideRow({
       onMouseEnter={onFocus}
       onFocus={onFocus}
       role="row"
+      {...menuTrigger}
       onKeyDown={(event) => {
         if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
         const buttons = Array.from(
@@ -2119,6 +2455,7 @@ function ChannelRow({
   onVisible,
   onPlay,
   onToggleFavorite,
+  onMenu,
 }: {
   channel: IptvChannel;
   guide?: IptvSnapshot["nowNext"][string];
@@ -2128,8 +2465,10 @@ function ChannelRow({
   onVisible: () => void;
   onPlay: () => void;
   onToggleFavorite: () => void;
+  onMenu: (x: number, y: number) => void;
 }) {
   const rowRef = useRef<HTMLElement | null>(null);
+  const menuTrigger = useChannelMenuTrigger(onMenu);
   const now = guide?.now;
   const next = guide?.next ?? guide?.later ?? guide?.upcoming?.[0];
   const progress = now
@@ -2167,6 +2506,7 @@ function ChannelRow({
       className={`livetv-row ${selected ? "is-selected" : ""}`}
       onMouseEnter={onFocus}
       onFocus={onFocus}
+      {...menuTrigger}
     >
       <button type="button" className="livetv-row-main" onClick={onPlay}>
         <span className="livetv-row-logo">

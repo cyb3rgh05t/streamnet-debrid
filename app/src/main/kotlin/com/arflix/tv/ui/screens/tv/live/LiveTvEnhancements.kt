@@ -530,7 +530,6 @@ private fun VariantRow(
                 shape = RoundedCornerShape(10.dp),
             )
             .onFocusChanged { focused = it.hasFocus }
-            .focusable()
             .clickable(onClick = onPick)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown && (event.key == Key.DirectionCenter || event.key == Key.Enter)) {

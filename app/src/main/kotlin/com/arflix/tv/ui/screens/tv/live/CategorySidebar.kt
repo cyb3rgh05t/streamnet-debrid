@@ -177,12 +177,6 @@ fun CategorySidebar(
         )
     }.orEmpty()
 
-    fun runActiveMenuAction(index: Int) {
-        activeMenuActions.getOrNull(index.coerceIn(0, (activeMenuActions.size - 1).coerceAtLeast(0)))
-            ?.onClick
-            ?.invoke()
-    }
-
     fun selectedCategoryLazyIndex(): Int? {
         var idx = 0
         tree.top.forEach { cat ->
@@ -299,32 +293,6 @@ fun CategorySidebar(
                 }
             }
             .onPreviewKeyEvent { ev ->
-                val menu = activeMenu
-                if (menu != null && activeMenuActions.isNotEmpty()) {
-                    val isSelect = ev.key == Key.DirectionCenter || ev.key == Key.Enter || ev.key == Key.Menu
-                    if (ev.type != KeyEventType.KeyDown) {
-                        return@onPreviewKeyEvent isSelect
-                    }
-                    return@onPreviewKeyEvent when (ev.key) {
-                        Key.DirectionUp -> {
-                            activeMenu = menu.copy(focusedIndex = (menu.focusedIndex - 1).coerceAtLeast(0))
-                            true
-                        }
-                        Key.DirectionDown -> {
-                            activeMenu = menu.copy(focusedIndex = (menu.focusedIndex + 1).coerceAtMost(activeMenuActions.lastIndex))
-                            true
-                        }
-                        Key.DirectionCenter, Key.Enter, Key.Menu -> {
-                            runActiveMenuAction(menu.focusedIndex)
-                            true
-                        }
-                        Key.DirectionLeft, Key.Back, Key.Escape -> {
-                            activeMenu = null
-                            true
-                        }
-                        else -> true
-                    }
-                }
                 if (ev.type != KeyEventType.KeyDown) {
                     false
                 } else when (ev.key) {
@@ -538,14 +506,12 @@ fun CategorySidebar(
             }
         }
         if (currentMenu != null && activeMenuActions.isNotEmpty()) {
-            CategoryContextMenu(
-                onDismiss = { activeMenu = null },
-                actions = activeMenuActions,
-                focusedIndex = currentMenu.focusedIndex.coerceIn(0, activeMenuActions.lastIndex),
-                onFocusedIndexChange = { index ->
-                    activeMenu = currentMenu.copy(focusedIndex = index.coerceIn(0, activeMenuActions.lastIndex))
+            LiveContextMenuDialog(
+                title = currentMenu.groupName,
+                entries = activeMenuActions.map { action ->
+                    LiveMenuEntry(stringResource(action.labelRes), action.icon, action.onClick)
                 },
-                onAction = { runActiveMenuAction(it) },
+                onDismiss = { activeMenu = null },
             )
         }
     }
@@ -839,44 +805,6 @@ private fun SidebarRow(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun CategoryContextMenu(
-    onDismiss: () -> Unit,
-    actions: List<CategoryMenuAction>,
-    focusedIndex: Int,
-    onFocusedIndexChange: (Int) -> Unit,
-    onAction: (Int) -> Unit,
-) {
-    if (actions.isEmpty()) return
-
-    Popup(
-        alignment = Alignment.CenterEnd,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(
-            focusable = false,
-            dismissOnBackPress = false,
-            dismissOnClickOutside = false,
-        ),
-    ) {
-        Column(
-            modifier = Modifier
-                .width(184.dp)
-                .background(LiveColors.PanelRaised, RoundedCornerShape(10.dp))
-                .border(1.dp, LiveColors.FocusRing.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
-                .padding(4.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            actions.forEachIndexed { index, action ->
-                CategoryMenuItem(
-                    action = action,
-                    focused = index == focusedIndex,
-                    onClick = action.onClick,
-                )
-            }
-        }
-    }
-}
 
 private fun buildCategoryMenuActions(
     canHide: Boolean,
@@ -914,46 +842,7 @@ private data class CategoryMenuState(
     val canMove: Boolean,
     val canHide: Boolean,
     val canUnhide: Boolean,
-    val focusedIndex: Int = 0,
 )
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun CategoryMenuItem(
-    action: CategoryMenuAction,
-    focused: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(36.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (focused) LiveColors.FocusRing else Color.Transparent)
-            .clickable { onClick() }
-            .pointerInput(onClick) { detectTapGestures(onTap = { onClick() }) }
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Icon(
-            imageVector = action.icon,
-            contentDescription = null,
-            tint = if (focused) Color.Black else LiveColors.FgDim,
-            modifier = Modifier.size(16.dp),
-        )
-        Text(
-            text = stringResource(action.labelRes),
-            style = LiveType.CatLabel.copy(
-                color = if (focused) Color.Black else LiveColors.Fg,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
 
 private fun selectedCountryGroupId(
     selectedId: String,
@@ -980,6 +869,7 @@ private fun iconFor(cat: LiveCategory): ImageVector? = when (cat.iconToken) {
     CategoryIcon.Music -> Icons.Filled.LibraryMusic
     CategoryIcon.Lock -> Icons.Filled.Lock
     CategoryIcon.Country -> Icons.Filled.Public
+    CategoryIcon.Hidden -> Icons.Filled.VisibilityOff
     CategoryIcon.SubEntry -> null
 }
 

@@ -34,6 +34,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
@@ -127,7 +133,14 @@ internal fun resolveNetflixAnchorChannelId(
 ): String? =
     listOf(playingId, rememberedId, focusedId).firstOrNull { it != null && it in indexById } ?: firstId
 
-private data class NetflixCategoryItem(val id: String, val label: String, val count: Int)
+private data class NetflixCategoryItem(
+    val id: String,
+    val label: String,
+    val count: Int,
+    val playlistId: String? = null,
+    val groupName: String? = null,
+    val hidden: Boolean = false,
+)
 
 /** Categories the Netflix chip row can show (a subset of what the classic sidebar offers). */
 internal fun netflixSelectableCategoryIds(tree: LiveCategoryTree): Set<String> = buildSet {
@@ -190,6 +203,12 @@ internal fun LiveTvNetflixLayout(
     onChannelSelected: (EnrichedChannel) -> Unit,
     onFavoriteToggle: (String) -> Unit,
     onOpenVariants: (EnrichedChannel) -> Unit,
+    onChannelMenu: (EnrichedChannel) -> Unit = {},
+    onHideCategory: (String?, String) -> Unit = { _, _ -> },
+    onUnhideCategory: (String?, String) -> Unit = { _, _ -> },
+    onMoveCategoryUp: (String?, String) -> Unit = { _, _ -> },
+    onMoveCategoryToTop: (String?, String) -> Unit = { _, _ -> },
+    onMoveCategoryDown: (String?, String) -> Unit = { _, _ -> },
     onMoveUpFromCategory: () -> Unit,
     onMoveDownToChannels: () -> Unit,
     onOpenFullscreen: () -> Unit,
@@ -352,6 +371,11 @@ internal fun LiveTvNetflixLayout(
             focusRequester = categoryFocusRequester,
             focusSelectedCategorySignal = focusSelectedCategorySignal,
             chipEntrySignal = chipEntrySignal,
+            onHideCategory = onHideCategory,
+            onUnhideCategory = onUnhideCategory,
+            onMoveCategoryUp = onMoveCategoryUp,
+            onMoveCategoryToTop = onMoveCategoryToTop,
+            onMoveCategoryDown = onMoveCategoryDown,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(CategoryRowHeight),
@@ -375,6 +399,7 @@ internal fun LiveTvNetflixLayout(
             onFavoriteToggle = onFavoriteToggle,
             variantCountFor = variantCountFor,
             onOpenVariants = onOpenVariants,
+            onChannelMenu = onChannelMenu,
             onMoveUp = { chipEntrySignal += 1 },
             focusSelectedChannelSignal = focusSelectedChannelSignal,
             railEntrySignal = railEntrySignal,
@@ -759,9 +784,53 @@ private fun NetflixCategoryChipRow(
     focusRequester: FocusRequester,
     focusSelectedCategorySignal: Int,
     chipEntrySignal: Int,
+    onHideCategory: (String?, String) -> Unit = { _, _ -> },
+    onUnhideCategory: (String?, String) -> Unit = { _, _ -> },
+    onMoveCategoryUp: (String?, String) -> Unit = { _, _ -> },
+    onMoveCategoryToTop: (String?, String) -> Unit = { _, _ -> },
+    onMoveCategoryDown: (String?, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val items = rememberNetflixCategoryItems(tree, hiddenGroups, groupOrder)
+    var menuItem by remember { mutableStateOf<NetflixCategoryItem?>(null) }
+    menuItem?.let { target ->
+        val groupName = target.groupName
+        if (groupName != null) {
+            val playlistId = target.playlistId
+            val entries = if (target.hidden) {
+                listOf(
+                    LiveMenuEntry(stringResource(R.string.live_menu_unhide_category), Icons.Filled.Visibility) {
+                        menuItem = null
+                        onUnhideCategory(playlistId, groupName)
+                    },
+                )
+            } else {
+                listOf(
+                    LiveMenuEntry(stringResource(R.string.live_menu_move_start), Icons.Filled.KeyboardArrowLeft) {
+                        menuItem = null
+                        onMoveCategoryToTop(playlistId, groupName)
+                    },
+                    LiveMenuEntry(stringResource(R.string.live_menu_move_left), Icons.Filled.KeyboardArrowLeft) {
+                        menuItem = null
+                        onMoveCategoryUp(playlistId, groupName)
+                    },
+                    LiveMenuEntry(stringResource(R.string.live_menu_move_right), Icons.Filled.KeyboardArrowRight) {
+                        menuItem = null
+                        onMoveCategoryDown(playlistId, groupName)
+                    },
+                    LiveMenuEntry(stringResource(R.string.live_menu_hide_category), Icons.Filled.VisibilityOff) {
+                        menuItem = null
+                        onHideCategory(playlistId, groupName)
+                    },
+                )
+            }
+            LiveContextMenuDialog(
+                title = target.label,
+                entries = entries,
+                onDismiss = { menuItem = null },
+            )
+        }
+    }
     val listState = rememberLazyListState()
     val selectedCategoryIndex = remember(items, selectedId) {
         items.indexOfFirst { it.id == selectedId }
@@ -914,17 +983,29 @@ private fun NetflixCategoryChipRow(
                 NetflixChip(
                     label = item.label, count = item.count, isSelected = item.id == selectedId,
                     onFocused = { focusedChipIndex = index + 1; onFocused() },
-                    onClick = { onSelect(item.id) },
+                    onClick = {
+                        val groupName = item.groupName
+                        if (item.hidden && groupName != null) onUnhideCategory(item.playlistId, groupName)
+                        else onSelect(item.id)
+                    },
+                    onLongClick = if (item.groupName != null) ({ menuItem = item }) else null,
                     onKeyMoveUp = { leavingDownward = false; onMoveUp() },
                     onKeyMoveDown = { leavingDownward = true; onMoveDown() },
                     focusRequester = if (item.id == selectedId) focusRequester else null,
-                    iconContent = if (item.id == "fav") {
-                        {
-                            Icon(imageVector = Icons.Filled.Star, contentDescription = null,
-                                tint = LiveColors.FgDim, modifier = Modifier.size(13.dp))
+                    iconContent = when {
+                        item.id == "fav" -> {
+                            {
+                                Icon(imageVector = Icons.Filled.Star, contentDescription = null,
+                                    tint = LiveColors.FgDim, modifier = Modifier.size(13.dp))
+                            }
                         }
-                    } else {
-                        null
+                        item.hidden || item.id == HIDDEN_CHANNELS_CATEGORY_ID -> {
+                            {
+                                Icon(imageVector = Icons.Filled.VisibilityOff, contentDescription = null,
+                                    tint = LiveColors.FgDim, modifier = Modifier.size(13.dp))
+                            }
+                        }
+                        else -> null
                     },
                 )
             }
@@ -932,7 +1013,7 @@ private fun NetflixCategoryChipRow(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
+@OptIn(ExperimentalTvMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun NetflixChip(
     label: String, count: Int?, isSelected: Boolean,
@@ -940,8 +1021,10 @@ private fun NetflixChip(
     onKeyMoveUp: () -> Unit, onKeyMoveDown: () -> Unit,
     focusRequester: FocusRequester?,
     iconContent: (@Composable () -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
+    var centerLongPressHandled by remember { mutableStateOf(false) }
     val bg = when {
         focused -> LiveColors.PanelRaised
         isSelected -> LiveColors.Accent.copy(alpha = 0.32f)
@@ -958,7 +1041,29 @@ private fun NetflixChip(
                 shape = RoundedCornerShape(999.dp))
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { focused = it.hasFocus; if (it.hasFocus) onFocused() }
-            .focusable()
+            // Held OK / Menu opens the category menu; the click then fires on key release instead.
+            .then(
+                if (onLongClick == null) Modifier else Modifier.onPreviewKeyEvent { ev ->
+                    val isCenterKey = ev.key == Key.DirectionCenter || ev.key == Key.Enter
+                    when {
+                        ev.type == KeyEventType.KeyDown && ev.key == Key.Menu -> {
+                            onLongClick(); true
+                        }
+                        isCenterKey && ev.type == KeyEventType.KeyDown -> {
+                            if (ev.nativeKeyEvent.repeatCount >= 1 && !centerLongPressHandled) {
+                                centerLongPressHandled = true
+                                onLongClick()
+                            }
+                            true
+                        }
+                        isCenterKey && ev.type == KeyEventType.KeyUp -> {
+                            if (centerLongPressHandled) centerLongPressHandled = false else onClick()
+                            true
+                        }
+                        else -> false
+                    }
+                }
+            )
             .onKeyEvent { ev ->
                 if (ev.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (ev.key) {
@@ -968,7 +1073,7 @@ private fun NetflixChip(
                     else -> false
                 }
             }
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 12.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1016,12 +1121,20 @@ private fun rememberNetflixCategoryItems(
     val allGlobal = orderedGlobal.map { it to liveCategoryLabel(it.label) }
     val allCountries = tree.countries.categories.map { it to liveCategoryLabel(it.label) }
     val allAdult = tree.adult.categories.map { it to liveCategoryLabel(it.label) }
+    val allHidden = tree.hidden.categories
+        .filter { it.playlistGroupName != null }
+        .map { it to liveCategoryLabel(it.label) }
     return remember(tree, orderedGlobal) {
         buildList {
             allTop.forEach { (cat, label) -> add(NetflixCategoryItem(cat.id, label, cat.count)) }
-            allGlobal.forEach { (cat, label) -> add(NetflixCategoryItem(cat.id, label, cat.count)) }
+            allGlobal.forEach { (cat, label) ->
+                add(NetflixCategoryItem(cat.id, label, cat.count, cat.playlistId, cat.playlistGroupName))
+            }
             allCountries.forEach { (cat, label) -> add(NetflixCategoryItem(cat.id, label, cat.count)) }
             allAdult.forEach { (cat, label) -> add(NetflixCategoryItem(cat.id, label, cat.count)) }
+            allHidden.forEach { (cat, label) ->
+                add(NetflixCategoryItem("hidden:${cat.id}", label, cat.count, cat.playlistId, cat.playlistGroupName, hidden = true))
+            }
         }.distinctBy { it.id }
     }
 }
@@ -1043,6 +1156,7 @@ private fun NetflixChannelRail(
     onFavoriteToggle: (String) -> Unit,
     variantCountFor: (EnrichedChannel) -> Int,
     onOpenVariants: (EnrichedChannel) -> Unit,
+    onChannelMenu: (EnrichedChannel) -> Unit,
     onMoveUp: () -> Unit,
     focusSelectedChannelSignal: Int,
     railEntrySignal: Int,
@@ -1154,7 +1268,7 @@ private fun NetflixChannelRail(
                         onChannelFocused(ch)
                     },
                     onClick = { onChannelSelected(ch) },
-                    onLongPress = { if (variantCountFor(ch) > 1) onOpenVariants(ch) else onFavoriteToggle(ch.id) },
+                    onLongPress = { onChannelMenu(ch) },
                     onKeyMoveUp = onMoveUp,
                     modifier = Modifier.focusRequester(requester),
                 )
@@ -1255,6 +1369,9 @@ private fun NetflixChannelCard(
             .onPreviewKeyEvent { ev ->
                 if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionUp) {
                     onKeyMoveUp(); return@onPreviewKeyEvent true
+                }
+                if (ev.type == KeyEventType.KeyDown && ev.key == Key.Menu) {
+                    onLongPress(); return@onPreviewKeyEvent true
                 }
                 val isCenterKey = ev.key == Key.DirectionCenter || ev.key == Key.Enter
                 if (isCenterKey && ev.type == KeyEventType.KeyDown && ev.nativeKeyEvent.repeatCount >= 1) {

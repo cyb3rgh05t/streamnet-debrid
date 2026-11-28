@@ -1654,8 +1654,16 @@
     <string name="live_menu_move_top">Move to top</string>
     <string name="live_menu_move_up">Move up</string>
     <string name="live_menu_move_down">Move down</string>
+    <string name="live_menu_move_start">Move to start</string>
+    <string name="live_menu_move_left">Move left</string>
+    <string name="live_menu_move_right">Move right</string>
     <string name="live_menu_hide_category">Hide category</string>
     <string name="live_menu_unhide_category">Unhide category</string>
+    <string name="live_menu_hide_channel">Hide channel</string>
+    <string name="live_menu_unhide_channel">Unhide channel</string>
+    <string name="live_menu_add_favorite">Add to favorites</string>
+    <string name="live_menu_remove_favorite">Remove from favorites</string>
+    <string name="live_cat_hidden_channels">Hidden channels</string>
     <string name="show_episode_ratings">Show Episode Ratings</string>
     <string name="show_episode_ratings_desc">Display episode ratings as a visual row below the episode list</string>
     <string name="ratings">Episode Ratings</string>

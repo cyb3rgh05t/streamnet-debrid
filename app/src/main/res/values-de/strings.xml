@@ -1507,8 +1507,16 @@
     <string name="live_menu_move_top">Ganz nach oben</string>
     <string name="live_menu_move_up">Nach oben</string>
     <string name="live_menu_move_down">Nach unten</string>
+    <string name="live_menu_move_start">Ganz nach links</string>
+    <string name="live_menu_move_left">Nach links</string>
+    <string name="live_menu_move_right">Nach rechts</string>
     <string name="live_menu_hide_category">Kategorie ausblenden</string>
     <string name="live_menu_unhide_category">Kategorie einblenden</string>
+    <string name="live_menu_hide_channel">Sender ausblenden</string>
+    <string name="live_menu_unhide_channel">Sender einblenden</string>
+    <string name="live_menu_add_favorite">Zu Favoriten hinzufügen</string>
+    <string name="live_menu_remove_favorite">Aus Favoriten entfernen</string>
+    <string name="live_cat_hidden_channels">Ausgeblendete Sender</string>
     <string name="show_episode_ratings">Episodenbewertungen anzeigen</string>
     <string name="show_episode_ratings_desc">Episodenbewertungen als visuelle Reihe unter der Episodenliste anzeigen</string>
     <string name="ratings">Episodenbewertungen</string>

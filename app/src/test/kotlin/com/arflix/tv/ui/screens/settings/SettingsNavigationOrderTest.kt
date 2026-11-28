@@ -34,6 +34,13 @@ class SettingsNavigationOrderTest {
     }
 
     @Test
+    fun `live tv layout settings moved from appearance to the tv section`() {
+        val appearance = tvGeneralRowsForSection("appearance")
+        assertThat(appearance).containsNoneOf(47, 48, 49, 50, 51)
+        assertThat(appearance.distinct()).isEqualTo(appearance)
+    }
+
+    @Test
     fun `appearance starts the profile category and occurs only once`() {
         val sections = settingsSectionOrder()
         assertThat(sections.take(4)).containsExactly(

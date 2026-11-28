@@ -290,4 +290,12 @@ class LiveTvStartupTest {
         assertThat(LiveTvStartup.validatedCategoryId("all", true, true, false, true, "grp:first")).isEqualTo("all")
         assertThat(LiveTvStartup.validatedCategoryId("all", true, true, false, false, "grp:first")).isEqualTo("grp:first")
     }
+
+    @Test
+    fun savedCategoryRestoreWaitsForTheFullChannelListInsteadOfFallingBack() {
+        assertThat(LiveTvStartup.categoryRestoreMustWait(null, "grp:magenta", channelsSettled = false)).isTrue()
+        assertThat(LiveTvStartup.categoryRestoreMustWait(null, "grp:magenta", channelsSettled = true)).isFalse()
+        assertThat(LiveTvStartup.categoryRestoreMustWait("grp:magenta", "grp:magenta", channelsSettled = false)).isFalse()
+        assertThat(LiveTvStartup.categoryRestoreMustWait(null, "", channelsSettled = false)).isFalse()
+    }
 }

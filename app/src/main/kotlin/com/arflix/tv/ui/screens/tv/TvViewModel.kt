@@ -21,10 +21,13 @@ import com.arflix.tv.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -101,6 +104,15 @@ class TvViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(TvUiState())
     val uiState: StateFlow<TvUiState> = _uiState.asStateFlow()
+
+    // Channel hide/order preferences are separate from the snapshot so changing them never rebuilds it.
+    val hiddenChannelIds: StateFlow<Set<String>> = iptvRepository.observeHiddenChannels()
+        .map { it.toSet() }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+    val channelOrder: StateFlow<List<String>> = iptvRepository.observeChannelOrder()
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     private var refreshJob: Job? = null
     private var epgRefreshJob: Job? = null
     private var warmVodJob: Job? = null
@@ -1363,6 +1375,24 @@ class TvViewModel @Inject constructor(
         viewModelScope.launch {
             iptvRepository.toggleFavoriteChannel(channelId)
         }
+    }
+
+    fun toggleHiddenChannel(channelId: String) {
+        viewModelScope.launch {
+            iptvRepository.toggleHiddenChannel(channelId)
+        }
+    }
+
+    fun moveChannelUp(channelId: String, visibleChannelIds: List<String>) {
+        viewModelScope.launch { iptvRepository.moveChannelUp(channelId, visibleChannelIds) }
+    }
+
+    fun moveChannelToTop(channelId: String, visibleChannelIds: List<String>) {
+        viewModelScope.launch { iptvRepository.moveChannelToTop(channelId, visibleChannelIds) }
+    }
+
+    fun moveChannelDown(channelId: String, visibleChannelIds: List<String>) {
+        viewModelScope.launch { iptvRepository.moveChannelDown(channelId, visibleChannelIds) }
     }
 
     fun toggleHiddenGroup(groupName: String) {
