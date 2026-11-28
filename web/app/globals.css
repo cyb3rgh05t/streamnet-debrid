@@ -705,6 +705,9 @@ p {
   position: absolute;
   inset: 14% 20%;
   display: grid;
+  /* Without an explicit track the row grows to the image's own height and the logo overflows the card. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .tv-channel-copy {

@@ -4,6 +4,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Web 1.0.096] - 2026-11-28
+
+- Web-Player, Startseite: Die Senderlogos der TV-Reihen werden jetzt vollständig und mittig in der Karte angezeigt; breite oder hohe Logos wurden unten abgeschnitten.
+
 ## [2.6.037] - 2026-11-28
 
 - Android, Menüs bei langem Druck: Alle Aktionsmenüs (Startseite, Serien-Details mit Folgen und Staffeln, Merkliste, Live TV) nutzen jetzt denselben Dialog im neuen Stil, mit zentriertem Titel (und bei Folgen/Staffeln/Filmen der Zeile darunter). Vorher gab es je Bildschirm eine eigene Variante. In den Serien-Details öffnet sich das Menü auf dem TV jetzt schon nach etwa 0,5 Sekunden gehaltenem OK (vorher erst beim Loslassen nach 0,9 Sekunden), die Menütaste funktioniert weiter. Auf dem Handy sind die Menüs jetzt ebenfalls dieser Dialog statt des Bottom-Sheets.
