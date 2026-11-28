@@ -11,6 +11,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,16 +37,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
@@ -66,6 +71,7 @@ import com.arflix.tv.ui.theme.BackgroundElevated
 import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
+import com.arflix.tv.ui.screens.tv.live.LiveColors
 import com.arflix.tv.util.tr
 import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.ui.skin.resolveAccentColor
@@ -99,6 +105,15 @@ fun TextInputModal(
     val accentColor = resolveAccentColor(fallback = Pink)
 
     var editTextRef by remember { mutableStateOf<EditText?>(null) }
+    // Once the EditText gives up focus (buttons row), the modal itself has to hold Compose focus,
+    // otherwise the D-pad keys reach nothing.
+    val modalFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(focusedButton) {
+        if (focusedButton >= 0) {
+            kotlinx.coroutines.delay(90)
+            runCatching { modalFocusRequester.requestFocus() }
+        }
+    }
     // Show/hide keyboard using the EditText window token (toggleSoftInput can get stuck on some TV IMEs).
     fun showKeyboard() {
         val editText = editTextRef ?: return
@@ -145,7 +160,9 @@ fun TextInputModal(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.95f))
+                .background(Color.Black.copy(alpha = 0.6f))
+                .focusRequester(modalFocusRequester)
+                .focusable()
                 .onKeyEvent { event ->
                     if (event.type == KeyEventType.KeyDown) {
                         when (event.key) {
@@ -207,17 +224,10 @@ fun TextInputModal(
             Column(
                 modifier = Modifier
                     .width(500.dp)
-                    .background(Color(0xFF1A1A1A), RoundedCornerShape(20.dp))
-                    .then(
-                        if (isTouchDevice) {
-                            Modifier.border(
-                                width = 1.5.dp,
-                                color = accentColor.copy(alpha = 0.72f),
-                                shape = RoundedCornerShape(20.dp),
-                            )
-                        } else Modifier
-                    )
-                    .padding(32.dp),
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(LiveColors.PanelRaised)
+                    .border(1.5.dp, accentColor.copy(alpha = 0.72f), RoundedCornerShape(14.dp))
+                    .padding(28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Title
@@ -225,18 +235,19 @@ fun TextInputModal(
                     text = title,
                     style = ArflixTypography.sectionTitle,
                     color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 22.dp)
                 )
 
                 // Input field using native EditText for better TV keyboard support
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(BackgroundElevated, RoundedCornerShape(12.dp))
+                        .background(LiveColors.PanelDeep, RoundedCornerShape(10.dp))
                         .border(
-                            width = 2.dp,
-                            color = if (focusedButton == -1) Pink else Pink.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(12.dp)
+                            width = if (focusedButton == -1) 2.dp else 1.dp,
+                            color = if (focusedButton == -1) accentColor else LiveColors.Divider,
+                            shape = RoundedCornerShape(10.dp)
                         )
                         .padding(4.dp)
                 ) {
@@ -247,6 +258,7 @@ fun TextInputModal(
                                 setText(inputText)
                                 setTextColor(android.graphics.Color.WHITE)
                                 setHintTextColor(android.graphics.Color.GRAY)
+                                highlightColor = accentColor.copy(alpha = 0.35f).toArgb()
                                 setHint(hint)
                                 textSize = 18f
                                 background = null
@@ -283,6 +295,13 @@ fun TextInputModal(
                                 }
 
                                 // Request focus and show keyboard
+                                setOnKeyListener { _, keyCode, keyEvent ->
+                                    if (keyEvent.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                                        focusedButton = 0
+                                        hideKeyboard()
+                                        true
+                                    } else false
+                                }
                                 setOnFocusChangeListener { v, hasFocus ->
                                     isInputFocused = hasFocus
                                     if (hasFocus) {
@@ -300,8 +319,8 @@ fun TextInputModal(
                             .fillMaxWidth()
                             .focusRequester(inputFocusRequester),
                         update = { editText ->
-                            // Request focus when modal becomes visible and show keyboard
-                            if (isVisible && !editText.hasFocus()) {
+                            // Request focus when modal becomes visible; not while the button row owns the D-pad.
+                            if (isVisible && focusedButton == -1 && !editText.hasFocus()) {
                                 editText.requestFocus()
                                 editText.postDelayed({
                                     val imm = context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? InputMethodManager
@@ -322,6 +341,7 @@ fun TextInputModal(
                     ActionButton(
                         text = stringResource(R.string.cancel).uppercase(),
                         isFocused = focusedButton == 0,
+                        accent = accentColor,
                         onClick = {
                             hideKeyboard()
                             onCancel()
@@ -331,6 +351,7 @@ fun TextInputModal(
                         text = stringResource(R.string.confirm).uppercase(),
                         isFocused = focusedButton == 1,
                         isPrimary = true,
+                        accent = accentColor,
                         onClick = {
                             hideKeyboard()
                             onConfirm(inputText)
@@ -347,36 +368,39 @@ fun TextInputModal(
 private fun ActionButton(
     text: String,
     isFocused: Boolean,
+    accent: Color,
     isPrimary: Boolean = false,
     onClick: () -> Unit
 ) {
+    val shape = RoundedCornerShape(10.dp)
     Box(
         modifier = Modifier
             .width(120.dp)
-            .height(48.dp)
+            .height(46.dp)
+            .clip(shape)
             .background(
                 when {
-                    isFocused -> if (isPrimary) Pink else Color.White
-                    isPrimary -> Pink.copy(alpha = 0.3f)
-                    else -> Color.White.copy(alpha = 0.1f)
-                },
-                RoundedCornerShape(8.dp)
+                    isFocused -> LiveColors.Panel
+                    isPrimary -> accent.copy(alpha = 0.18f)
+                    else -> LiveColors.PanelDeep
+                }
             )
             .border(
-                width = if (isFocused) 0.dp else 1.dp,
-                color = if (isPrimary) Pink else Color.White.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(8.dp)
-            ),
+                width = if (isFocused) 2.dp else 1.dp,
+                color = when {
+                    isFocused -> accent
+                    isPrimary -> accent.copy(alpha = 0.6f)
+                    else -> LiveColors.Divider
+                },
+                shape = shape
+            )
+            .pointerInput(onClick) { detectTapGestures { onClick() } },
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
             style = ArflixTypography.button,
-            color = if (isFocused) {
-                Color.Black
-            } else {
-                if (isPrimary) Pink else TextSecondary
-            },
+            color = if (isFocused || isPrimary) Color.White else TextSecondary,
             textAlign = TextAlign.Center
         )
     }

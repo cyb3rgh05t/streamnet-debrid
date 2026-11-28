@@ -86,7 +86,7 @@ fun ArvioMenuDialog(
                     .width(320.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(LiveColors.PanelRaised)
-                    .border(1.dp, LiveColors.DividerStrong, RoundedCornerShape(14.dp))
+                    .border(1.5.dp, LiveColors.Accent.copy(alpha = 0.72f), RoundedCornerShape(14.dp))
                     .pointerInput(Unit) { detectTapGestures { } }
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),

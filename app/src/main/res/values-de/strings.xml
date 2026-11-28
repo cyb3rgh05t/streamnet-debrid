@@ -1498,6 +1498,10 @@
     <string name="iptv_xtream_detected">Xtream-Anbieter erkannt. Live-Sender werden geladen...</string>
     <string name="iptv_xtream_timeout">Zeitüberschreitung beim Xtream-Anbieter während des Ladens der Live-Sender.</string>
     <string name="library_default">Mediathek</string>
+    <string name="watchlist_eyebrow_library">Deine verbundene Mediathek</string>
+    <string name="watchlist_provider_library_title">%1$s Mediathek</string>
+    <string name="watchlist_titles_count">%1$d Titel</string>
+    <string name="watchlist_filter_all">Alle</string>
     <string name="library_named">Mediathek %1$s</string>
     <string name="program_no_title">Kein Titel</string>
     <string name="program_unknown">Unbekannte Sendung</string>

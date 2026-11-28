@@ -689,7 +689,7 @@ class WatchlistViewModel @Inject constructor(
     private fun loadActiveSourceItems(forceRefresh: Boolean = false) {
         val activeSource = _uiState.value.selectedSource
         val cacheKey = activeSource.id
-        val cached = sourceItemsCache[cacheKey]
+        val cached = sourceItemsCache[cacheKey].takeUnless { forceRefresh }
         if (forceRefresh) {
             sourceLoadMoreJob?.cancel()
             sourcePageStates[cacheKey] = sourcePageStates[cacheKey]?.copy(isLoadingMore = false)
@@ -1148,8 +1148,8 @@ class WatchlistViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            val hadItems = _uiState.value.allItems.isNotEmpty()
-            _uiState.value = _uiState.value.copy(isLoading = !hadItems)
+            val startedAt = System.currentTimeMillis()
+            _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val remoteConnected = runCatching { remoteSyncManager.isRemoteConnected() }.getOrDefault(false)
                 val syncedFromTrakt = if (remoteConnected) {
@@ -1181,6 +1181,11 @@ class WatchlistViewModel @Inject constructor(
                     toastMessage = context.getString(R.string.watchlist_error_refresh),
                     toastType = ToastType.ERROR
                 )
+            } finally {
+                // Quick refreshes would otherwise flash by unnoticed.
+                val remaining = 700L - (System.currentTimeMillis() - startedAt)
+                if (remaining > 0) kotlinx.coroutines.delay(remaining)
+                if (_uiState.value.isLoading) _uiState.value = _uiState.value.copy(isLoading = false)
             }
         }
     }

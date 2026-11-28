@@ -609,7 +609,8 @@ fun MediaCard(
                         )
                     ),
                     color = if (showProgress || (showReleaseYear && releaseYear != null) ||
-                        (!showReleaseYear && (releaseDateText != null || hasValidYear))
+                        (!showReleaseYear && (releaseDateText != null || hasValidYear)) ||
+                        (item.subtitle.isBlank() && (item.mediaType == MediaType.TV || item.mediaType == MediaType.MOVIE))
                     ) {
                         resolveAccentColor(ArvioSkin.colors.accent).copy(alpha = 0.95f)
                     } else {

@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.038] - 2026-11-28
+
+- Android, Merkliste: „Meine Merkliste“ ist jetzt wie im Web aufgebaut: ein gemeinsames Grid aus Filmen und Serien statt zwei getrennter Reihen, mit Titelbereich (Überschrift und Anzahl der Titel; bei Mediatheken mit kleiner Zeile darüber), den Tabs oben und Filter-Pillen „Alle / Filme / Serien“ sowie Suche und Aktualisieren. Die Tastensteuerung entspricht der der Heimserver-/Trakt-Mediathek (Pfeiltasten durch das Grid, OK öffnet, langes OK entfernt den Titel). Der Titelbereich erscheint auch bei Heimserver-, Trakt- und Simkl-Mediatheken. Ist „Meine Merkliste“ die einzige Quelle, wird der gleichnamige Tab ausgeblendet (die Überschrift zeigt es schon) und die Navigation springt direkt zu den Filtern. Kompiliert; nicht auf einem Gerät geprüft.
+- Android, Merkliste: Beim Aktualisieren dreht sich jetzt das Aktualisieren-Symbol in der Akzentfarbe und das Grid wird abgedunkelt mit Spinner, mindestens 0,7 Sekunden lang (vorher war bei vorhandenen Titeln nichts zu sehen). Gilt für Meine Merkliste, Trakt/Simkl und Heimserver.
+- Android, Merkliste: Im Tab „Alle“ sind Filme und Serien jetzt nach Erscheinungsdatum sortiert (neueste zuerst, Titel ohne Datum zuletzt) statt erst alle Filme, dann alle Serien. Die Beschriftungen „Film“ und „TV-Serie“ unter den Karten (wenn kein Datum bekannt ist) erscheinen in der Akzentfarbe. Nach dem Öffnen eines Titels und dem Zurückgehen bleiben Tab, Filter, Suche und die Position im Grid erhalten (vorher sprang sie zurück). Kompiliert und die Sortierung per Test geprüft; nicht auf einem Gerät geprüft.
+- Android, Such-/Texteingabe-Dialog: Die D-Pad-Steuerung funktioniert wieder (Runter zu den Buttons, Links/Rechts, Hoch zurück ins Feld; vorher holte sich das Eingabefeld den Fokus sofort zurück), und nach dem Schließen reagiert die Merkliste wieder auf die Fernbedienung. Ergibt eine Suche keinen Treffer, wird sie zurückgesetzt (inklusive Filter „Alle“), es erscheint kurz „Keine passenden Titel“ und die komplette Liste wird wieder angezeigt.
+- Android, Such-/Texteingabe-Dialog: Der Dialog hat jetzt den Stil der übrigen App-Dialoge (gleiche Panel-Farben, Rundung, Rahmen in der Akzentfarbe, auch beim Aktionsmenü und beim Sortier-Dialog der Mediathek) und nutzt überall die Akzentfarbe statt festem Pink; Abbrechen/Bestätigen sind einheitlich gestaltet.
+
 ## [Web 1.0.097] - 2026-11-28
 
 - Web-Player, Startseite: Die Senderlogos der TV-Reihen füllen ihre Fläche jetzt fest aus (absolut positioniert, eingepasst) statt von Prozent-Höhen abzuhängen; dadurch werden auch hohe Logos wie „Sky Atlantic“ vollständig angezeigt. In einer Testseite mit den echten Styles geprüft (hohes Quadrat-Logo bleibt komplett sichtbar und mittig); die Startseite selbst nicht.

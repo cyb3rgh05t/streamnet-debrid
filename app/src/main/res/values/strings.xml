@@ -1642,6 +1642,10 @@
     <string name="iptv_xtream_detected">Detected Xtream provider. Loading live channels...</string>
     <string name="iptv_xtream_timeout">Xtream provider timed out while loading live channels.</string>
     <string name="library_default">Library</string>
+    <string name="watchlist_eyebrow_library">Your connected library</string>
+    <string name="watchlist_provider_library_title">%1$s Library</string>
+    <string name="watchlist_titles_count">%1$d titles</string>
+    <string name="watchlist_filter_all">All</string>
     <string name="library_named">Library %1$s</string>
     <string name="program_no_title">No Title</string>
     <string name="program_unknown">Unknown program</string>

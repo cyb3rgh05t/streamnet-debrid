@@ -3,8 +3,12 @@ package com.arflix.tv.ui.screens.watchlist
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -55,6 +59,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,13 +77,12 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import com.arflix.tv.ui.screens.home.animateHomeScrollDelta
-import kotlin.math.abs
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.draw.clip
+import com.arflix.tv.ui.screens.tv.live.LiveColors
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -131,12 +135,28 @@ private enum class WatchlistFocusZone {
     CONTENT
 }
 
+/** Sortable "yyyy-MM-dd" key of a title's release; undated titles get "" and sort last when descending. */
+internal fun watchlistReleaseSortKey(item: MediaItem): String {
+    val raw = item.releaseDate?.trim().orEmpty()
+    Regex("^(\\d{4}-\\d{2}-\\d{2})").find(raw)?.let { return it.groupValues[1] }
+    if (raw.isNotBlank()) {
+        runCatching {
+            java.time.LocalDate.parse(raw, java.time.format.DateTimeFormatter.ofPattern("d MMM uuuu", java.util.Locale.US))
+                .toString()
+        }.getOrNull()?.let { return it }
+    }
+    val year = item.year.trim()
+    return if (year.length == 4 && year.all(Char::isDigit)) "$year-01-01" else ""
+}
+
 private data class LibraryFilter(
     val label: String,
     val isSort: Boolean = false,
     val isSearch: Boolean = false,
     val isRefresh: Boolean = false,
-    val iconOnly: Boolean = false
+    val iconOnly: Boolean = false,
+    val isType: Boolean = false,
+    val mediaType: MediaType? = null
 )
 
 private data class LibraryProviderOption(
@@ -199,7 +219,6 @@ fun WatchlistScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val libraryState by viewModel.libraryState.collectAsStateWithLifecycle()
-    val smoothScrolling by viewModel.smoothScrolling.collectAsStateWithLifecycle()
     val logoUrls by viewModel.logoUrls.collectAsStateWithLifecycle()
     val isMobile = LocalDeviceType.current.isTouchDevice()
     val usePosterCards = rememberCardLayoutMode() == CardLayoutMode.POSTER
@@ -228,24 +247,25 @@ fun WatchlistScreen(
     com.arflix.tv.ui.components.PreserveTopBarFocus(
         sidebarFocusIndex, hasProfile, hasOfflineDownloads
     ) { sidebarFocusIndex = it }
-    var focusZone by remember { mutableStateOf(if (isMobile) WatchlistFocusZone.CONTENT else WatchlistFocusZone.TOP_BAR) }
+    // Saveable so that the position survives opening a title and coming back.
+    var focusZone by rememberSaveable { mutableStateOf(if (isMobile) WatchlistFocusZone.CONTENT else WatchlistFocusZone.TOP_BAR) }
     // Entry focus is decided once the lists are known and stops as soon as the user moves.
-    var entryFocusLocked by remember { mutableStateOf(false) }
-    var providerFocusIndex by remember { mutableIntStateOf(0) }
-    var libraryFocusIndex by remember { mutableIntStateOf(0) }
-    var filterFocusIndex by remember { mutableIntStateOf(0) }
-    var focusedSectionIndex by remember { mutableIntStateOf(0) }
-    var focusedItemIndex by remember { mutableIntStateOf(0) }
+    var entryFocusLocked by rememberSaveable { mutableStateOf(false) }
+    var providerFocusIndex by rememberSaveable { mutableIntStateOf(0) }
+    var libraryFocusIndex by rememberSaveable { mutableIntStateOf(0) }
+    var filterFocusIndex by rememberSaveable { mutableIntStateOf(0) }
+    var watchlistTypeFilter by rememberSaveable { mutableStateOf<MediaType?>(null) }
+    var focusedItemIndex by rememberSaveable { mutableIntStateOf(0) }
     var enterKeyDownTimeMs by remember { mutableLongStateOf(-1L) }
     var showSearchModal by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
     var sortFocusIndex by remember { mutableIntStateOf(0) }
-    var selectedProviderId by remember { mutableStateOf(WATCHLIST_PROVIDER_ID) }
-    var trackerSearchQuery by remember { mutableStateOf("") }
+    var selectedProviderId by rememberSaveable { mutableStateOf(WATCHLIST_PROVIDER_ID) }
+    var trackerSearchQuery by rememberSaveable { mutableStateOf("") }
+    var searchToastMessage by remember { mutableStateOf<String?>(null) }
     var contextMenuItem by remember { mutableStateOf<MediaItem?>(null) }
     var contextMenuCanRemoveWatchlist by remember { mutableStateOf(false) }
     val longPressThresholdMs = 500L
-    val watchlistColumnState = rememberLazyListState()
     val libraryGridState = rememberLazyGridState()
 
     val trackerGroups = remember(uiState.sources) {
@@ -312,6 +332,19 @@ fun WatchlistScreen(
                 item.overview.contains(query, ignoreCase = true)
         }
     }
+    val watchlistItems = remember(uiState.movies, uiState.series, watchlistTypeFilter, trackerSearchQuery) {
+        val query = trackerSearchQuery.trim()
+        val combined = (uiState.movies + uiState.series).filter { item ->
+            (watchlistTypeFilter == null || item.mediaType == watchlistTypeFilter) &&
+                (query.isBlank() || item.title.contains(query, ignoreCase = true))
+        }
+        // "All" mixes both types, so it follows the release date (newest first, undated last).
+        if (watchlistTypeFilter == null) {
+            combined.sortedByDescending { watchlistReleaseSortKey(it) }
+        } else {
+            combined
+        }
+    }
     val activeLibraryState = when {
         isHomeServerMode -> libraryState
         isTrackerMode -> HomeLibraryUiState(
@@ -323,7 +356,12 @@ fun WatchlistScreen(
             searchQuery = trackerSearchQuery,
             error = uiState.error
         )
-        else -> HomeLibraryUiState()
+        else -> HomeLibraryUiState(
+            selectedSourceRef = uiState.selectedSourceId,
+            items = watchlistItems,
+            isLoading = uiState.isLoading,
+            searchQuery = trackerSearchQuery
+        )
     }
     val selectedLibraryIndex = providerLibraries.indexOfFirst { it.sourceRef == activeLibraryState.selectedSourceRef }
         .coerceAtLeast(0)
@@ -333,8 +371,16 @@ fun WatchlistScreen(
             LibraryFilter(tr("Search"), isSearch = true, iconOnly = true),
             LibraryFilter(tr("Refresh"), isRefresh = true, iconOnly = true)
         )
+    } else if (isTrackerMode) {
+        listOf(
+            LibraryFilter(tr("Search"), isSearch = true, iconOnly = true),
+            LibraryFilter(tr("Refresh"), isRefresh = true, iconOnly = true)
+        )
     } else {
         listOf(
+            LibraryFilter(stringResource(R.string.watchlist_filter_all), isType = true, mediaType = null),
+            LibraryFilter(stringResource(R.string.movies), isType = true, mediaType = MediaType.MOVIE),
+            LibraryFilter(stringResource(R.string.series), isType = true, mediaType = MediaType.TV),
             LibraryFilter(tr("Search"), isSearch = true, iconOnly = true),
             LibraryFilter(tr("Refresh"), isRefresh = true, iconOnly = true)
         )
@@ -344,10 +390,6 @@ fun WatchlistScreen(
         tr("Highest rated") to HomeServerLibrarySort.RATING,
         tr("Title A-Z") to HomeServerLibrarySort.TITLE
     )
-    val watchlistSections = listOf(
-        "movies" to uiState.movies,
-        "series" to uiState.series
-    ).filter { it.second.isNotEmpty() }
     val watchlistTotal = uiState.movies.size + uiState.series.size
     val isLibraryMode = isHomeServerMode || isTrackerMode
     val visibleLibraryItems = activeLibraryState.items
@@ -355,21 +397,14 @@ fun WatchlistScreen(
     // Fanart behind the focused card; disabled with the OLED black background and on touch devices.
     val fanartEnabled = !isMobile && !LocalOledBlackBackground.current
     val fanartUrl: String? = if (fanartEnabled && focusZone == WatchlistFocusZone.CONTENT) {
-        val focused = if (isLibraryMode) {
-            visibleLibraryItems.getOrNull(focusedItemIndex)
-        } else {
-            watchlistSections.getOrNull(focusedSectionIndex)?.second?.getOrNull(focusedItemIndex)
-        }
+        val focused = visibleLibraryItems.getOrNull(focusedItemIndex)
         focused?.backdrop?.takeIf { it.isNotBlank() } ?: focused?.image?.takeIf { it.isNotBlank() }
     } else {
         null
     }
     fun moveToContent() {
         focusZone = WatchlistFocusZone.CONTENT
-        focusedItemIndex = focusedItemIndex.coerceIn(
-            0,
-            ((if (isLibraryMode) visibleLibraryItems.size else watchlistSections.firstOrNull()?.second?.size) ?: 1) - 1
-        ).coerceAtLeast(0)
+        focusedItemIndex = focusedItemIndex.coerceIn(0, visibleLibraryItems.size - 1).coerceAtLeast(0)
     }
 
     fun activateProvider(index: Int) {
@@ -389,13 +424,13 @@ fun WatchlistScreen(
             }
         }
         libraryFocusIndex = 0
-        focusedSectionIndex = 0
         focusedItemIndex = 0
     }
 
     fun activateFilter(index: Int) {
         val filter = filters.getOrNull(index) ?: return
         when {
+            filter.isType -> watchlistTypeFilter = filter.mediaType
             filter.isSearch -> showSearchModal = true
             filter.isRefresh -> if (isHomeServerMode) viewModel.refreshLibrary() else viewModel.refresh()
             filter.isSort -> {
@@ -426,7 +461,19 @@ fun WatchlistScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // With only "My Watchlist" there is nothing to switch to, so the tab (and its focus stop) is hidden.
+    val showProviderTabs = providers.size > 1
+    LaunchedEffect(showProviderTabs) {
+        if (!showProviderTabs && focusZone == WatchlistFocusZone.PROVIDERS) focusZone = WatchlistFocusZone.FILTERS
+    }
     LaunchedEffect(Unit) { rootFocusRequester.requestFocus() }
+    // The search dialog takes the focus with it; hand it back so the D-pad keeps working afterwards.
+    LaunchedEffect(showSearchModal) {
+        if (!showSearchModal) {
+            delay(150)
+            runCatching { rootFocusRequester.requestFocus() }
+        }
+    }
     // Nothing saved and no other source: stay on the navigation. A connected home server or tracker
     // puts the focus on the source tabs, otherwise it jumps to the first saved item.
     LaunchedEffect(uiState.isLoading, providers.size, watchlistTotal, entryFocusLocked) {
@@ -434,12 +481,22 @@ fun WatchlistScreen(
         when {
             providers.size > 1 -> focusZone = WatchlistFocusZone.PROVIDERS
             watchlistTotal > 0 -> {
-                focusedSectionIndex = 0
                 focusedItemIndex = 0
                 focusZone = WatchlistFocusZone.CONTENT
             }
             else -> focusZone = WatchlistFocusZone.TOP_BAR
         }
+    }
+    // A search without any hit is dropped again so the full list is shown instead of an empty page.
+    val noSearchHits = activeLibraryState.searchQuery.isNotBlank() &&
+        activeLibraryState.items.isEmpty() &&
+        !activeLibraryState.isLoading &&
+        !activeLibraryState.isLoadingMore
+    LaunchedEffect(noSearchHits, activeLibraryState.searchQuery) {
+        if (!noSearchHits) return@LaunchedEffect
+        searchToastMessage = localizedContext.getString(R.string.library_no_matching_titles)
+        watchlistTypeFilter = null
+        if (isHomeServerMode) viewModel.setLibrarySearch("") else trackerSearchQuery = ""
     }
     LaunchedEffect(providers.map { it.id }) {
         if (providers.none { it.id == selectedProviderId }) {
@@ -450,30 +507,23 @@ fun WatchlistScreen(
     }
     LaunchedEffect(selectedProviderIndex) { providerFocusIndex = selectedProviderIndex }
     LaunchedEffect(selectedLibraryIndex) { libraryFocusIndex = selectedLibraryIndex }
-    LaunchedEffect(
-        activeLibraryState.selectedSourceRef,
-        activeLibraryState.sort,
-        activeLibraryState.searchQuery
-    ) {
-        focusedItemIndex = 0
-        if (isLibraryMode) libraryGridState.scrollToItem(0)
-    }
-    LaunchedEffect(watchlistSections.size, uiState.movies.size, uiState.series.size) {
-        if (watchlistSections.isNotEmpty() && focusedSectionIndex >= watchlistSections.size) {
-            focusedSectionIndex = 0
+    // Only a real change of source, sort, search or filter resets the position; the first run after
+    // coming back from a details page must keep it.
+    val libraryViewKey = "${activeLibraryState.selectedSourceRef}|${activeLibraryState.sort}|${activeLibraryState.searchQuery}|$watchlistTypeFilter"
+    var lastLibraryViewKey by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(libraryViewKey) {
+        if (lastLibraryViewKey != null && lastLibraryViewKey != libraryViewKey) {
             focusedItemIndex = 0
+            libraryGridState.scrollToItem(0)
         }
+        lastLibraryViewKey = libraryViewKey
     }
-    LaunchedEffect(focusedSectionIndex, watchlistSections.size, focusZone) {
-        if (!isLibraryMode && focusZone == WatchlistFocusZone.CONTENT && watchlistSections.isNotEmpty()) {
-            watchlistColumnState.animateScrollToItem(focusedSectionIndex)
-        }
-    }
-    LaunchedEffect(focusedItemIndex, isLibraryMode, visibleLibraryItems.size) {
-        if (isLibraryMode && visibleLibraryItems.isNotEmpty()) {
+    LaunchedEffect(focusedItemIndex, visibleLibraryItems.size) {
+        if (visibleLibraryItems.isNotEmpty()) {
             val safe = focusedItemIndex.coerceIn(0, visibleLibraryItems.lastIndex)
+            if (safe != focusedItemIndex) focusedItemIndex = safe
             libraryGridState.bringItemIntoView(safe)
-            if (safe >= visibleLibraryItems.size - libraryColumns * 2) {
+            if (isLibraryMode && safe >= visibleLibraryItems.size - libraryColumns * 2) {
                 if (isHomeServerMode) viewModel.loadMoreLibrary() else viewModel.loadMoreActiveSource()
             }
         }
@@ -484,7 +534,7 @@ fun WatchlistScreen(
         activeLibraryState.hasMore
     ) {
         val last = libraryGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-        if (isMobile && last >= visibleLibraryItems.size - libraryColumns * 2) {
+        if (isLibraryMode && isMobile && last >= visibleLibraryItems.size - libraryColumns * 2) {
             if (isHomeServerMode) viewModel.loadMoreLibrary() else viewModel.loadMoreActiveSource()
         }
     }
@@ -541,17 +591,17 @@ fun WatchlistScreen(
                                 WatchlistFocusZone.LIBRARIES -> Unit
                                 WatchlistFocusZone.FILTERS -> {
                                     if (filterFocusIndex == 0) {
-                                        providerFocusIndex = providers.lastIndex.coerceAtLeast(0)
-                                        focusZone = WatchlistFocusZone.PROVIDERS
+                                        if (showProviderTabs) {
+                                            providerFocusIndex = providers.lastIndex.coerceAtLeast(0)
+                                            focusZone = WatchlistFocusZone.PROVIDERS
+                                        }
                                     } else {
                                         filterFocusIndex = (filterFocusIndex - 1).coerceAtLeast(0)
                                     }
                                 }
                                 WatchlistFocusZone.CONTENT -> {
-                                    if (isLibraryMode) {
-                                        if (focusedItemIndex % libraryColumns > 0) focusedItemIndex--
-                                        else if (providerLibraries.isNotEmpty()) focusZone = WatchlistFocusZone.LIBRARIES
-                                    } else if (focusedItemIndex > 0) focusedItemIndex--
+                                    if (focusedItemIndex % libraryColumns > 0) focusedItemIndex--
+                                    else if (providerLibraries.isNotEmpty()) focusZone = WatchlistFocusZone.LIBRARIES
                                 }
                             }
                             true
@@ -560,7 +610,7 @@ fun WatchlistScreen(
                             when (focusZone) {
                                 WatchlistFocusZone.TOP_BAR -> sidebarFocusIndex = (sidebarFocusIndex + 1).coerceAtMost(maxSidebarIndex)
                                 WatchlistFocusZone.PROVIDERS -> {
-                                    if (isLibraryMode && providerFocusIndex >= providers.lastIndex) {
+                                    if (providerFocusIndex >= providers.lastIndex) {
                                         filterFocusIndex = 0
                                         focusZone = WatchlistFocusZone.FILTERS
                                     } else {
@@ -570,8 +620,7 @@ fun WatchlistScreen(
                                 WatchlistFocusZone.LIBRARIES -> focusZone = WatchlistFocusZone.FILTERS
                                 WatchlistFocusZone.FILTERS -> filterFocusIndex = (filterFocusIndex + 1).coerceAtMost(filters.lastIndex)
                                 WatchlistFocusZone.CONTENT -> {
-                                    val max = if (isLibraryMode) visibleLibraryItems.lastIndex else watchlistSections.getOrNull(focusedSectionIndex)?.second?.lastIndex ?: -1
-                                    if (focusedItemIndex < max) focusedItemIndex++
+                                    if (focusedItemIndex < visibleLibraryItems.lastIndex) focusedItemIndex++
                                 }
                             }
                             true
@@ -581,25 +630,26 @@ fun WatchlistScreen(
                                 WatchlistFocusZone.TOP_BAR -> Unit
                                 WatchlistFocusZone.PROVIDERS -> focusZone = WatchlistFocusZone.TOP_BAR
                                 WatchlistFocusZone.LIBRARIES -> {
-                                    if (libraryFocusIndex > 0) libraryFocusIndex-- else focusZone = WatchlistFocusZone.PROVIDERS
+                                    if (libraryFocusIndex > 0) libraryFocusIndex--
+                                    else focusZone = if (showProviderTabs) WatchlistFocusZone.PROVIDERS else WatchlistFocusZone.TOP_BAR
                                 }
                                 WatchlistFocusZone.FILTERS -> focusZone = WatchlistFocusZone.TOP_BAR
                                 WatchlistFocusZone.CONTENT -> {
-                                    if (isLibraryMode) {
-                                        if (focusedItemIndex >= libraryColumns) focusedItemIndex -= libraryColumns else focusZone = WatchlistFocusZone.FILTERS
-                                    } else if (focusedSectionIndex > 0) {
-                                        focusedSectionIndex--
-                                        focusedItemIndex = 0
-                                    } else {
-                                        focusZone = WatchlistFocusZone.PROVIDERS
-                                    }
+                                    if (focusedItemIndex >= libraryColumns) focusedItemIndex -= libraryColumns else focusZone = WatchlistFocusZone.FILTERS
                                 }
                             }
                             true
                         }
                         Key.DirectionDown -> {
                             when (focusZone) {
-                                WatchlistFocusZone.TOP_BAR -> focusZone = WatchlistFocusZone.PROVIDERS
+                                WatchlistFocusZone.TOP_BAR -> {
+                                    if (showProviderTabs) {
+                                        focusZone = WatchlistFocusZone.PROVIDERS
+                                    } else {
+                                        filterFocusIndex = filterFocusIndex.coerceIn(0, filters.lastIndex)
+                                        focusZone = WatchlistFocusZone.FILTERS
+                                    }
+                                }
                                 WatchlistFocusZone.PROVIDERS -> {
                                     focusZone = if (isLibraryMode && providerLibraries.isNotEmpty()) WatchlistFocusZone.LIBRARIES else WatchlistFocusZone.CONTENT
                                 }
@@ -608,13 +658,8 @@ fun WatchlistScreen(
                                 }
                                 WatchlistFocusZone.FILTERS -> if (visibleLibraryItems.isNotEmpty()) moveToContent()
                                 WatchlistFocusZone.CONTENT -> {
-                                    if (isLibraryMode) {
-                                        val next = focusedItemIndex + libraryColumns
-                                        if (next < visibleLibraryItems.size) focusedItemIndex = next
-                                    } else if (focusedSectionIndex < watchlistSections.lastIndex) {
-                                        focusedSectionIndex++
-                                        focusedItemIndex = 0
-                                    }
+                                    val next = focusedItemIndex + libraryColumns
+                                    if (next < visibleLibraryItems.size) focusedItemIndex = next
                                 }
                             }
                             true
@@ -655,11 +700,7 @@ fun WatchlistScreen(
                 } else if (event.type == KeyEventType.KeyUp && effectiveKey in listOf(Key.Enter, Key.DirectionCenter)) {
                     if (focusZone == WatchlistFocusZone.CONTENT && enterKeyDownTimeMs >= 0L) {
                         val holdMs = SystemClock.elapsedRealtime() - enterKeyDownTimeMs
-                        val item = if (isLibraryMode) {
-                            visibleLibraryItems.getOrNull(focusedItemIndex)
-                        } else {
-                            watchlistSections.getOrNull(focusedSectionIndex)?.second?.getOrNull(focusedItemIndex)
-                        }
+                        val item = visibleLibraryItems.getOrNull(focusedItemIndex)
                         if (item != null) {
                             if (!isLibraryMode && holdMs >= longPressThresholdMs) viewModel.removeFromWatchlist(item)
                             else onNavigateToDetails(item.mediaType, item.id)
@@ -689,14 +730,21 @@ fun WatchlistScreen(
                 .fillMaxSize()
                 .padding(top = if (isMobile) 0.dp else AppTopBarHeight - 10.dp)
         ) {
-            if (isMobile) {
-                Text(
-                    text = stringResource(R.string.library_default),
-                    style = ArflixTypography.heroTitle.copy(fontSize = 28.sp),
-                    color = TextPrimary,
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 12.dp)
-                )
+            val headerTitle = if (activeProvider.isWatchlist) {
+                stringResource(R.string.watchlist_my_watchlist)
+            } else {
+                stringResource(R.string.watchlist_provider_library_title, activeProvider.label)
             }
+            LibraryHeader(
+                eyebrow = if (activeProvider.isWatchlist) null else stringResource(R.string.watchlist_eyebrow_library),
+                title = headerTitle,
+                countLabel = if (activeLibraryState.items.isEmpty()) {
+                    null
+                } else {
+                    stringResource(R.string.watchlist_titles_count, activeLibraryState.items.size)
+                },
+                isMobile = isMobile
+            )
 
             ProviderTabs(
                 providers = providers,
@@ -704,8 +752,10 @@ fun WatchlistScreen(
                 focusedIndex = if (focusZone == WatchlistFocusZone.PROVIDERS) providerFocusIndex else -1,
                 libraryState = activeLibraryState,
                 filters = filters,
+                selectedTypeFilter = watchlistTypeFilter,
                 focusedFilterIndex = if (focusZone == WatchlistFocusZone.FILTERS) filterFocusIndex else -1,
-                showLibraryControls = isLibraryMode,
+                showLibraryControls = true,
+                showProviders = showProviderTabs,
                 isMobile = isMobile,
                 onSelect = ::activateProvider,
                 onFilterSelect = { index ->
@@ -714,59 +764,44 @@ fun WatchlistScreen(
                 }
             )
 
-            if (isLibraryMode) {
-                HomeLibraryContent(
-                    state = activeLibraryState,
-                    logoUrls = logoUrls,
-                    libraries = providerLibraries,
-                    selectedLibraryIndex = selectedLibraryIndex,
-                    focusedLibraryIndex = if (focusZone == WatchlistFocusZone.LIBRARIES) libraryFocusIndex else -1,
-                    focusedItemIndex = if (focusZone == WatchlistFocusZone.CONTENT) focusedItemIndex else -1,
-                    gridState = libraryGridState,
-                    columns = libraryColumns,
-                    cardWidth = libraryCardWidth,
-                    isLandscape = !usePosterCards,
-                    isMobile = isMobile,
-                    onLibrarySelect = { index, library ->
-                        libraryFocusIndex = index
-                        if (isHomeServerMode) {
-                            viewModel.selectLibrary(library.sourceRef)
-                        } else {
-                            viewModel.selectSource(library.sourceRef)
-                        }
-                        focusedItemIndex = 0
-                    },
-                    onItemFocused = { focusedItemIndex = it },
-                    onItemVisible = viewModel::ensureLogo,
-                    onItemClick = { onNavigateToDetails(it.mediaType, it.id) },
-                    onItemLongPress = { item ->
-                        contextMenuItem = item
-                        contextMenuCanRemoveWatchlist = false
-                    },
-                    onLoadMore = {
-                        if (isHomeServerMode) viewModel.loadMoreLibrary() else viewModel.loadMoreActiveSource()
+            HomeLibraryContent(
+                state = activeLibraryState,
+                logoUrls = logoUrls,
+                libraries = providerLibraries,
+                selectedLibraryIndex = selectedLibraryIndex,
+                focusedLibraryIndex = if (focusZone == WatchlistFocusZone.LIBRARIES) libraryFocusIndex else -1,
+                focusedItemIndex = if (focusZone == WatchlistFocusZone.CONTENT) focusedItemIndex else -1,
+                gridState = libraryGridState,
+                columns = libraryColumns,
+                cardWidth = libraryCardWidth,
+                isLandscape = !usePosterCards,
+                isMobile = isMobile,
+                emptyTitle = if (isLibraryMode) null else stringResource(R.string.empty_watchlist),
+                emptySubtitle = if (isLibraryMode) null else stringResource(R.string.add_later),
+                onLibrarySelect = { index, library ->
+                    libraryFocusIndex = index
+                    if (isHomeServerMode) {
+                        viewModel.selectLibrary(library.sourceRef)
+                    } else {
+                        viewModel.selectSource(library.sourceRef)
                     }
-                )
-            } else {
-                WatchlistContent(
-                    uiState = uiState,
-                    sections = watchlistSections,
-                    logoUrls = logoUrls,
-                    cardWidth = cardWidth,
-                    isLandscape = !usePosterCards,
-                    isMobile = isMobile,
-                    focusedSectionIndex = if (focusZone == WatchlistFocusZone.CONTENT) focusedSectionIndex else -1,
-                    focusedItemIndex = if (focusZone == WatchlistFocusZone.CONTENT) focusedItemIndex else -1,
-                    smoothScrolling = smoothScrolling,
-                    listState = watchlistColumnState,
-                    onItemFocused = { index -> focusedItemIndex = index },
-                    onItemClick = { onNavigateToDetails(it.mediaType, it.id) },
-                    onItemLongPress = { item ->
-                        contextMenuItem = item
-                        contextMenuCanRemoveWatchlist = true
+                    focusedItemIndex = 0
+                },
+                onItemFocused = { focusedItemIndex = it },
+                onItemVisible = viewModel::ensureLogo,
+                onItemClick = { onNavigateToDetails(it.mediaType, it.id) },
+                onItemLongPress = { item ->
+                    contextMenuItem = item
+                    contextMenuCanRemoveWatchlist = !isLibraryMode
+                },
+                onLoadMore = {
+                    if (isHomeServerMode) {
+                        viewModel.loadMoreLibrary()
+                    } else if (isLibraryMode) {
+                        viewModel.loadMoreActiveSource()
                     }
-                )
-            }
+                }
+            )
         }
 
         contextMenuItem?.let { item ->
@@ -799,6 +834,15 @@ fun WatchlistScreen(
                 },
                 isVisible = true,
                 onDismiss = viewModel::dismissToast
+            )
+        }
+
+        searchToastMessage?.let { message ->
+            Toast(
+                message = message,
+                type = ComponentToastType.INFO,
+                isVisible = true,
+                onDismiss = { searchToastMessage = null }
             )
         }
 
@@ -851,8 +895,10 @@ private fun ProviderTabs(
     focusedIndex: Int,
     libraryState: HomeLibraryUiState,
     filters: List<LibraryFilter>,
+    selectedTypeFilter: MediaType?,
     focusedFilterIndex: Int,
     showLibraryControls: Boolean,
+    showProviders: Boolean,
     isMobile: Boolean,
     onSelect: (Int) -> Unit,
     onFilterSelect: (Int) -> Unit
@@ -861,7 +907,7 @@ private fun ProviderTabs(
     val tabListState = rememberLazyListState()
     val focusedTabIndex = when {
         focusedIndex >= 0 -> focusedIndex
-        showLibraryControls && focusedFilterIndex >= 0 -> providers.size + focusedFilterIndex
+        showLibraryControls && focusedFilterIndex >= 0 -> (if (showProviders) providers.size else 0) + focusedFilterIndex
         else -> -1
     }
     LaunchedEffect(focusedTabIndex) {
@@ -875,7 +921,7 @@ private fun ProviderTabs(
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 1.dp),
         horizontalArrangement = Arrangement.spacedBy(7.dp)
     ) {
-        itemsIndexed(providers, key = { _, provider -> provider.id }) { index, provider ->
+        if (showProviders) itemsIndexed(providers, key = { _, provider -> provider.id }) { index, provider ->
             SelectablePill(
                 label = provider.label,
                 selected = index == selectedIndex,
@@ -892,6 +938,7 @@ private fun ProviderTabs(
                     state = libraryState,
                     filter = filter,
                     index = index,
+                    selectedTypeFilter = selectedTypeFilter,
                     focusedFilterIndex = focusedFilterIndex,
                     isMobile = isMobile,
                     onSelect = { onFilterSelect(index) }
@@ -915,6 +962,8 @@ private fun ColumnScope.HomeLibraryContent(
     cardWidth: Dp,
     isLandscape: Boolean,
     isMobile: Boolean,
+    emptyTitle: String? = null,
+    emptySubtitle: String? = null,
     onLibrarySelect: (Int, HomeServerCatalogCandidate) -> Unit,
     onItemFocused: (Int) -> Unit,
     onItemVisible: (MediaItem) -> Unit,
@@ -940,6 +989,8 @@ private fun ColumnScope.HomeLibraryContent(
             cardWidth = cardWidth,
             isLandscape = isLandscape,
             isMobile = true,
+            emptyTitle = emptyTitle,
+            emptySubtitle = emptySubtitle,
             onItemFocused = onItemFocused,
             onItemVisible = onItemVisible,
             onItemClick = onItemClick,
@@ -951,12 +1002,14 @@ private fun ColumnScope.HomeLibraryContent(
             modifier = Modifier.fillMaxWidth().weight(1f),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            LibrarySidebar(
-                libraries = libraries,
-                selectedIndex = selectedLibraryIndex,
-                focusedIndex = focusedLibraryIndex,
-                onSelect = onLibrarySelect
-            )
+            if (libraries.isNotEmpty()) {
+                LibrarySidebar(
+                    libraries = libraries,
+                    selectedIndex = selectedLibraryIndex,
+                    focusedIndex = focusedLibraryIndex,
+                    onSelect = onLibrarySelect
+                )
+            }
             Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
                 LibraryResults(
                     state = state,
@@ -967,6 +1020,8 @@ private fun ColumnScope.HomeLibraryContent(
                     cardWidth = cardWidth,
                     isLandscape = isLandscape,
                     isMobile = false,
+                    emptyTitle = emptyTitle,
+                    emptySubtitle = emptySubtitle,
                     onItemFocused = onItemFocused,
                     onItemVisible = onItemVisible,
                     onItemClick = onItemClick,
@@ -1164,12 +1219,14 @@ private fun LibraryFilterControl(
     state: HomeLibraryUiState,
     filter: LibraryFilter,
     index: Int,
+    selectedTypeFilter: MediaType?,
     focusedFilterIndex: Int,
     isMobile: Boolean,
     onSelect: () -> Unit
 ) {
     val uiAccent = resolveAccentColor(fallback = Pink)
     val selected = when {
+        filter.isType -> filter.mediaType == selectedTypeFilter
         filter.isSort -> true
         filter.isSearch -> state.searchQuery.isNotBlank()
         else -> false
@@ -1190,6 +1247,7 @@ private fun LibraryFilterControl(
         accent = uiAccent,
         compact = true,
         iconOnly = filter.iconOnly,
+        spinning = filter.isRefresh && state.isLoading,
         icon = when {
             filter.isSort -> Icons.AutoMirrored.Outlined.Sort
             filter.isSearch -> Icons.Outlined.Search
@@ -1210,27 +1268,30 @@ private fun SortSelectionOverlay(
     onSelect: (HomeServerLibrarySort) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val accent = resolveAccentColor(fallback = Pink)
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.62f))
+            .background(Color.Black.copy(alpha = 0.6f))
             .clickable(enabled = isMobile) { onDismiss() },
         contentAlignment = Alignment.Center
     ) {
         Column(
             modifier = Modifier
                 .width(if (isMobile) 304.dp else 330.dp)
-                .background(Color(0xFF151719), RoundedCornerShape(8.dp))
-                .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(14.dp))
+                .background(LiveColors.PanelRaised)
+                .border(1.5.dp, accent.copy(alpha = 0.72f), RoundedCornerShape(14.dp))
                 .clickable(enabled = isMobile) { }
-                .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
                 text = tr("Sort library"),
                 style = ArflixTypography.sectionTitle.copy(fontSize = 18.sp),
                 color = Color.White,
-                modifier = Modifier.padding(start = 10.dp, top = 4.dp, bottom = 7.dp)
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 7.dp)
             )
             options.forEachIndexed { index, (label, sort) ->
                 val focused = index == focusedIndex
@@ -1241,16 +1302,16 @@ private fun SortSelectionOverlay(
                         .height(46.dp)
                         .background(
                             when {
-                                selected -> Color.White.copy(alpha = if (focused) 0.15f else 0.1f)
-                                focused -> Color.White.copy(alpha = 0.06f)
-                                else -> Color.Transparent
+                                selected -> accent.copy(alpha = if (focused) 0.22f else 0.14f)
+                                focused -> LiveColors.Panel
+                                else -> LiveColors.PanelDeep
                             },
-                            RoundedCornerShape(6.dp)
+                            RoundedCornerShape(10.dp)
                         )
                         .border(
                             if (focused) 2.dp else 1.dp,
-                            if (focused) Color.White else Color.Transparent,
-                            RoundedCornerShape(6.dp)
+                            if (focused) accent else LiveColors.Divider,
+                            RoundedCornerShape(10.dp)
                         )
                         .clickable(enabled = isMobile) {
                             onFocus(index)
@@ -1290,6 +1351,8 @@ private fun ColumnScope.LibraryResults(
     cardWidth: Dp,
     isLandscape: Boolean,
     isMobile: Boolean,
+    emptyTitle: String? = null,
+    emptySubtitle: String? = null,
     onItemFocused: (Int) -> Unit,
     onItemVisible: (MediaItem) -> Unit,
     onItemClick: (MediaItem) -> Unit,
@@ -1303,8 +1366,8 @@ private fun ColumnScope.LibraryResults(
             subtitle = state.error
         )
         state.items.isEmpty() -> LibraryMessage(
-            title = if (state.searchQuery.isBlank()) stringResource(R.string.library_empty) else stringResource(R.string.library_no_matching_titles),
-            subtitle = if (state.searchQuery.isBlank()) stringResource(R.string.library_choose_another) else stringResource(R.string.library_try_different_search)
+            title = if (state.searchQuery.isBlank()) emptyTitle ?: stringResource(R.string.library_empty) else stringResource(R.string.library_no_matching_titles),
+            subtitle = if (state.searchQuery.isBlank()) emptySubtitle ?: stringResource(R.string.library_choose_another) else stringResource(R.string.library_try_different_search)
         )
         else -> {
             val contentAlpha by animateFloatAsState(
@@ -1389,58 +1452,42 @@ private fun ColumnScope.LibraryResults(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun ColumnScope.WatchlistContent(
-    uiState: WatchlistUiState,
-    sections: List<Pair<String, List<MediaItem>>>,
-    logoUrls: Map<String, String>,
-    cardWidth: Dp,
-    isLandscape: Boolean,
-    isMobile: Boolean,
-    focusedSectionIndex: Int,
-    focusedItemIndex: Int,
-    smoothScrolling: Boolean = false,
-    listState: androidx.compose.foundation.lazy.LazyListState,
-    onItemFocused: (Int) -> Unit,
-    onItemClick: (MediaItem) -> Unit,
-    onItemLongPress: (MediaItem) -> Unit
+private fun LibraryHeader(
+    eyebrow: String?,
+    title: String,
+    countLabel: String?,
+    isMobile: Boolean
 ) {
-    val totalItems = uiState.movies.size + uiState.series.size
-    when {
-        uiState.isLoading -> CenteredLoading()
-        totalItems == 0 -> {
-            EmptyContentState(
-                title = stringResource(R.string.empty_watchlist),
-                subtitle = stringResource(R.string.add_later),
-                icon = Icons.Outlined.Bookmark,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp, end = 24.dp, top = if (isMobile) 16.dp else 4.dp, bottom = if (isMobile) 10.dp else 6.dp),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            if (eyebrow != null) {
+                Text(
+                    text = eyebrow.uppercase(),
+                    style = ArflixTypography.caption.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                    color = resolveAccentColor(fallback = Pink)
+                )
+            }
+            Text(
+                text = title,
+                style = ArflixTypography.heroTitle.copy(fontSize = if (isMobile) 26.sp else 24.sp),
+                color = TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
-        else -> {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 24.dp, end = 48.dp),
-                contentPadding = PaddingValues(top = 10.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(if (isMobile) 24.dp else 16.dp),
-                userScrollEnabled = isMobile
-            ) {
-                itemsIndexed(sections, key = { _, item -> item.first }) { sectionIdx, (sectionType, items) ->
-                    WatchlistItemsSection(
-                        title = if (sectionType == "movies") tr("Movies") else tr("Series"),
-                        items = items,
-                        logoUrls = logoUrls,
-                        cardWidth = cardWidth,
-                        isLandscape = isLandscape,
-                        isMobile = isMobile,
-                        focusedItemIndex = if (focusedSectionIndex == sectionIdx) focusedItemIndex else -1,
-                        smoothScrolling = smoothScrolling,
-                        onItemFocused = onItemFocused,
-                        onItemClick = onItemClick,
-                        onItemLongPress = onItemLongPress
-                    )
-                }
-            }
+        if (countLabel != null) {
+            Text(
+                text = countLabel,
+                style = ArflixTypography.caption.copy(fontSize = 12.sp),
+                color = Color.White.copy(alpha = 0.55f),
+                modifier = Modifier.padding(start = 12.dp, bottom = 4.dp)
+            )
         }
     }
 }
@@ -1456,7 +1503,8 @@ private fun SelectablePill(
     leading: Color? = null,
     compact: Boolean = false,
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
-    iconOnly: Boolean = false
+    iconOnly: Boolean = false,
+    spinning: Boolean = false
 ) {
     val shape = RoundedCornerShape(percent = 50)
     val scale by animateFloatAsState(
@@ -1495,7 +1543,22 @@ private fun SelectablePill(
             Box(modifier = Modifier.size(7.dp).background(leading, RoundedCornerShape(percent = 50)))
         }
         if (icon != null) {
-            Icon(icon, contentDescription = if (iconOnly) label else null, tint = foreground, modifier = Modifier.size(16.dp))
+            val rotation = if (spinning) {
+                rememberInfiniteTransition(label = "pill-spin").animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)),
+                    label = "pill-spin-angle"
+                ).value
+            } else {
+                0f
+            }
+            Icon(
+                icon,
+                contentDescription = if (iconOnly) label else null,
+                tint = if (spinning) accent else foreground,
+                modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = rotation }
+            )
         }
         if (!iconOnly) {
             Text(
@@ -1592,81 +1655,4 @@ private fun LibraryMessage(title: String, subtitle: String) {
         subtitle = subtitle,
         icon = Icons.Outlined.Bookmark,
     )
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun WatchlistItemsSection(
-    title: String,
-    items: List<MediaItem>,
-    logoUrls: Map<String, String>,
-    cardWidth: Dp,
-    isLandscape: Boolean,
-    isMobile: Boolean = false,
-    focusedItemIndex: Int = -1,
-    smoothScrolling: Boolean = false,
-    onItemFocused: (Int) -> Unit = {},
-    onItemClick: (MediaItem) -> Unit,
-    onItemLongPress: (MediaItem) -> Unit = {}
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = title,
-            style = ArflixTypography.sectionTitle,
-            color = TextPrimary,
-            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
-        )
-
-        val lazyListState = rememberLazyListState()
-        val density = LocalDensity.current
-        val itemSpanPx = remember(density, cardWidth) { with(density) { (cardWidth + 16.dp).toPx().coerceAtLeast(1f) } }
-        // Same rail behaviour as the Home rows: the focused card sits in the first slot and the
-        // row moves underneath it. "Smooth scrolling" (default off) decides between a spring and a snap.
-        LaunchedEffect(focusedItemIndex) {
-            if (focusedItemIndex < 0) return@LaunchedEffect
-            val target = focusedItemIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
-            val currentFirst = lazyListState.firstVisibleItemIndex
-            val currentOffset = lazyListState.firstVisibleItemScrollOffset
-            if (target == currentFirst && currentOffset == 0) return@LaunchedEffect
-            if (!smoothScrolling || abs(target - currentFirst) > 7) {
-                lazyListState.scrollToItem(target)
-                return@LaunchedEffect
-            }
-            lazyListState.animateHomeScrollDelta(
-                deltaPx = (target - currentFirst) * itemSpanPx - currentOffset,
-                durationMillis = if (abs(target - currentFirst) >= 3) 180 else 150
-            )
-            if (lazyListState.firstVisibleItemIndex != target || lazyListState.firstVisibleItemScrollOffset > 6) {
-                lazyListState.scrollToItem(target)
-            }
-        }
-
-        LazyRow(
-            state = lazyListState,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            itemsIndexed(
-                items = items,
-                key = { index, item -> watchlistItemKey(item, index) },
-                contentType = { _, item -> "${item.mediaType.name}_card" }
-            ) { index, item ->
-                MediaCard(
-                    item = item,
-                    width = cardWidth,
-                    isLandscape = isLandscape,
-                    logoImageUrl = logoUrls[watchlistLogoKey(item)],
-                    showTitle = true,
-                    titleMaxLines = 1,
-                    marqueeTitleOnFocus = true,
-                    isFocusedOverride = index == focusedItemIndex && focusedItemIndex >= 0,
-                    enableSystemFocus = false,
-                    onFocused = { onItemFocused(index) },
-                    onClick = { onItemClick(item) },
-                    onLongClick = { onItemLongPress(item) }
-                )
-            }
-        }
-    }
 }
