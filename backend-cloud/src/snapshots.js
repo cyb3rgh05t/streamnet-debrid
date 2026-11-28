@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import { preserveStreamNetHostOverrides } from "./streamnet-host-overrides.js";
 
 export function payloadMetrics(payload) {
@@ -54,6 +55,17 @@ export function payloadMetrics(payload) {
 export function payloadUpdatedAtMillis(payload) {
   const updatedAt = Number(payload?.updatedAt || 0);
   return Number.isSafeInteger(updatedAt) && updatedAt > 0 ? updatedAt : null;
+}
+
+/**
+ * Whether two snapshots hold the same data. Only the top-level `updatedAt` is ignored: every device stamps
+ * it with the push time, so it differs even when nothing else changed. Key order does not matter.
+ */
+export function payloadsEquivalent(left, right) {
+  if (!isPlainObject(left) || !isPlainObject(right)) return false;
+  const { updatedAt: _left, ...leftRest } = left;
+  const { updatedAt: _right, ...rightRest } = right;
+  return isDeepStrictEqual(leftRest, rightRest);
 }
 
 /**

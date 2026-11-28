@@ -70,8 +70,9 @@ try {
     .query(
       `select count(*) filter (where outcome = 'accepted') as accepted,
               count(*) filter (where outcome = 'conflict') as conflicts,
+              count(*) filter (where outcome = 'unchanged') as unchanged,
               count(distinct account_id) as accounts,
-              coalesce(avg(payload_bytes) filter (where outcome = 'accepted'), 0) as avg_bytes,
+              coalesce(avg(payload_bytes) filter (where outcome <> 'conflict'), 0) as avg_bytes,
               coalesce(sum(payload_bytes), 0) as total_bytes,
               min(created_at) as since
          from sync_push_log where created_at > now() - interval '7 days'`,
@@ -81,19 +82,22 @@ try {
   console.log("\nSync-Pushes der letzten 7 Tage:");
   if (!pushes) {
     console.log("  Tabelle sync_push_log fehlt – erst `npm run migrate` ausführen.");
-  } else if (!Number(pushes.accepted) && !Number(pushes.conflicts)) {
+  } else if (!Number(pushes.accepted) && !Number(pushes.conflicts) && !Number(pushes.unchanged)) {
     console.log("  Noch keine Daten (die Messung läuft ab dem Update mit Migration 015).");
   } else {
-    const total = Number(pushes.accepted) + Number(pushes.conflicts);
+    const total = Number(pushes.accepted) + Number(pushes.conflicts) + Number(pushes.unchanged);
     console.log(`  Seit ${new Date(pushes.since).toISOString()}: ${total} Pushes von ${pushes.accounts} Accounts`);
-    console.log(`  Angenommen ${pushes.accepted} · Konflikte (409) ${pushes.conflicts} = ${((Number(pushes.conflicts) / total) * 100).toFixed(1)} %`);
+    console.log(`  Angenommen ${pushes.accepted} · Ohne Änderung ${pushes.unchanged} (keine neue Revision, ab Migration 016) · Konflikte (409) ${pushes.conflicts} = ${((Number(pushes.conflicts) / total) * 100).toFixed(1)} %`);
     console.log(`  Ø Push-Größe ${kb(pushes.avg_bytes)} · hochgeladen gesamt ${kb(pushes.total_bytes)}`);
 
     // Accounts that push far more often than the rest. Short ids only, no emails or content.
+    // The device columns stay empty until migration 016 ran and devices send their id.
     const top = (await pool.query(
       `select left(account_id::text, 8) as id,
               count(*) as pushes,
               count(*) filter (where outcome = 'conflict') as conflicts,
+              count(*) filter (where outcome = 'unchanged') as unchanged,
+              count(distinct source_device_id) as devices,
               coalesce(sum(payload_bytes), 0) as bytes,
               min(created_at) as first_at,
               max(created_at) as last_at
@@ -102,17 +106,18 @@ try {
         group by account_id
         order by pushes desc
         limit 10`,
-    )).rows;
+    ).catch((error) => (error.code === "42703" ? { rows: [] } : Promise.reject(error)))).rows;
     if (top.length) {
       console.log("\nAuffällige Accounts, letzte 24 Stunden (nach Anzahl Pushes):");
-      console.log("  ID        Pushes  pro Std.  409   Upload        erster → letzter Push (UTC)");
+      console.log("  ID        Pushes  pro Std.  409  leer  Geräte  Upload        erster → letzter Push (UTC)");
       for (const row of top) {
         const spanHours = Math.max((new Date(row.last_at) - new Date(row.first_at)) / 3_600_000, 1);
         const perHour = Number(row.pushes) / spanHours;
         const time = (value) => new Date(value).toISOString().slice(11, 16);
         console.log(
           `  ${row.id}  ${String(row.pushes).padStart(6)}  ${perHour.toFixed(1).padStart(8)}  ` +
-          `${String(row.conflicts).padStart(3)}  ${kb(row.bytes).padStart(10)}   ${time(row.first_at)} → ${time(row.last_at)}`,
+          `${String(row.conflicts).padStart(3)}  ${String(row.unchanged).padStart(4)}  ${String(row.devices).padStart(6)}  ` +
+          `${kb(row.bytes).padStart(10)}   ${time(row.first_at)} → ${time(row.last_at)}`,
         );
       }
     }

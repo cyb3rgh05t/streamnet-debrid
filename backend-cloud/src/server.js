@@ -15,6 +15,7 @@ import {
   dropRedundantLegacyCatalogs,
   mergePushPayloadByFieldTimestamps,
   payloadMetrics,
+  payloadsEquivalent,
   payloadUpdatedAtMillis,
 } from "./snapshots.js";
 import { backendLoggerOptions, registerRequestLogging } from "./logger.js";
@@ -24,7 +25,7 @@ import { registerAdminRoutes } from "./admin-routes.js";
 import { applyAppSettingValues } from "./admin-snapshots.js";
 import { readAppSettingDefaults } from "./app-setting-defaults.js";
 import { registerPresenceRoutes } from "./presence.js";
-import { buildAccountSyncEvent, syncEventKinds } from "./sync-events.js";
+import { buildAccountSyncEvent, normalizeSourceDeviceId, syncEventKinds } from "./sync-events.js";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: config.databaseUrl });
@@ -1209,16 +1210,21 @@ async function seedAppSettingDefaults(payload) {
   }
 }
 
-// Measurement only (see scripts/sync-stats.js): never delays or fails a sync, and a missing table is ignored.
+// Measurement only (see scripts/sync-stats.js): never delays or fails a sync, and a missing table or column is ignored.
 function recordSyncPush(request, accountId, outcome) {
   const bytes = Math.min(Number(request.headers["content-length"]) || 0, 2 ** 31 - 1);
+  const deviceId = normalizeSourceDeviceId(request.body?.sourceDeviceId);
   pool
-    .query("insert into sync_push_log (account_id, outcome, payload_bytes) values ($1, $2, $3)", [accountId, outcome, bytes])
+    .query(
+      "insert into sync_push_log (account_id, outcome, payload_bytes, source_device_id) values ($1, $2, $3, $4)",
+      [accountId, outcome, bytes, deviceId],
+    )
     .then(() => (Math.random() < 0.01
       ? pool.query("delete from sync_push_log where created_at < now() - interval '14 days'")
       : null))
     .catch((error) => {
-      if (error?.code !== "42P01") app.log.warn({ err: error }, "Sync push could not be recorded");
+      // 42P01/42703: migration 015/016 has not run yet. 23514: outcome not allowed before migration 016.
+      if (!["42P01", "42703", "23514"].includes(error?.code)) app.log.warn({ err: error }, "Sync push could not be recorded");
     });
 }
 
@@ -1260,6 +1266,18 @@ app.post("/account-sync-push", async (request, reply) => {
       current?.payload,
     );
     dropRedundantLegacyCatalogs(storedPayload);
+    // A push that changes nothing (the merged result equals what is stored) writes no new revision and wakes no
+    // other device: that only made every device download the same snapshot again.
+    if (current && payloadsEquivalent(storedPayload, current.payload)) {
+      await client.query("rollback");
+      recordSyncPush(request, account.id, "unchanged");
+      return {
+        accepted: true,
+        unchanged: true,
+        revision,
+        ...payloadMetrics(current.payload),
+      };
+    }
     const nextRevision = revision + 1;
     await client.query(
       `insert into account_sync_snapshots (account_id, payload, revision, payload_updated_at, source)

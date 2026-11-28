@@ -4,6 +4,11 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.075] - 2026-11-28
+
+- Backend, Cloud-Sync: Ein Push, der den gespeicherten Snapshot inhaltlich nicht ändert (nach dem Zusammenführen ist er bis auf den Zeitstempel `updatedAt` identisch), schreibt keine neue Revision mehr und weckt die anderen Geräte nicht mehr auf. Die Antwort bleibt `accepted: true` (zusätzlich `unchanged: true`, mit der unveränderten Revision), Apps und Web brauchen dafür kein Update. Hintergrund: Die Messung zeigt Accounts mit 70 bis 170 Pushes pro Stunde, und jeder Push erzeugte bisher eine Revision plus ein Ereignis, auf das jedes andere Gerät den ganzen Snapshot (im Median 220 KB) herunterlud. Der gespeicherte `updatedAt` bleibt bei solchen Pushes auf dem alten Wert; die Android-App nutzt ihn nur intern für Zeitvergleiche. Nicht geprüft: auf echten Geräten.
+- Backend, Messung: Migration 016 ergänzt `sync_push_log` um die Geräte-Id und das Ergebnis `unchanged`. `scripts/sync-stats.js` zeigt je Account zusätzlich leere Pushes und die Anzahl der Geräte, die gepusht haben. Vor dem Neustart `npm run migrate` ausführen; ohne Migration läuft der Sync normal weiter, nur die neuen Messwerte fehlen.
+
 ## [2.6.034] - 2026-11-27
 
 - Android, Handy im Hochformat: Der TMDB-Hintergrund auf der Profilauswahl, dem Ladescreen und der Cloud-Verbindung zeigt jetzt das Poster (2:3) statt des 16:9-Hintergrunds. Vorher wurde das Querformat-Bild auf dem Hochformat-Display auf einen schmalen, stark vergrößerten Ausschnitt (z. B. ein Gesicht) beschnitten. Im Querformat und auf dem TV bleibt der bisherige Hintergrund. Außerdem ist die Profilauswahl auf dem Handy im Querformat kompakter (kleineres Logo, Kacheln und Abstände) und scrollt im Notfall, damit „Profile verwalten“ nicht mehr unten abgeschnitten wird. Kompiliert; nicht auf einem Gerät geprüft.

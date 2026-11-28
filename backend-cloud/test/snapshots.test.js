@@ -4,8 +4,37 @@ import {
   dropRedundantLegacyCatalogs,
   mergePushPayloadByFieldTimestamps,
   payloadMetrics,
+  payloadsEquivalent,
   payloadUpdatedAtMillis,
 } from "../src/snapshots.js";
+
+test("a push that only restamps updatedAt is equivalent to the stored snapshot", () => {
+  const current = {
+    updatedAt: 1000,
+    profiles: [{ id: "p1", name: "A" }],
+    settings: { subtitles: "de", autoplay: true },
+    fieldUpdatedAt: { "g:settings": 500 },
+  };
+  const incoming = {
+    fieldUpdatedAt: { "g:settings": 500 },
+    settings: { autoplay: true, subtitles: "de" },
+    profiles: [{ name: "A", id: "p1" }],
+    updatedAt: 99_000,
+  };
+  const merged = mergePushPayloadByFieldTimestamps(incoming, current);
+  assert.equal(payloadsEquivalent(merged, current), true);
+});
+
+test("a changed field or a missing section is not equivalent", () => {
+  const current = { updatedAt: 1, settings: { autoplay: true }, fieldUpdatedAt: { "g:settings": 5 } };
+  const changed = mergePushPayloadByFieldTimestamps(
+    { updatedAt: 2, settings: { autoplay: false }, fieldUpdatedAt: { "g:settings": 9 } },
+    current,
+  );
+  assert.equal(payloadsEquivalent(changed, current), false);
+  assert.equal(payloadsEquivalent({ updatedAt: 2, settings: current.settings }, current), false);
+  assert.equal(payloadsEquivalent(null, current), false);
+});
 
 test("the legacy catalogs list is dropped only when every profile has its own catalogs entry", () => {
   const complete = { profiles: [{ id: "a" }, { id: "b" }], catalogs: [{ id: "x" }], catalogsByProfile: { a: [], b: [{ id: "x" }] } };
